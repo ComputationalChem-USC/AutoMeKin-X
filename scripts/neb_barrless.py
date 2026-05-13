@@ -2,7 +2,8 @@
 
 import numpy as np
 import networkx as nx
-from ase.autoneb import AutoNEB
+from ase.mep import AutoNEB
+#from ase.autoneb import AutoNEB
 from ase.constraints import ExternalForce,FixAtoms
 from ase.dimer import DimerControl, MinModeAtoms, MinModeTranslate
 from ase.io import read, write
@@ -100,7 +101,7 @@ except Exception as e:
     exit()
 
 #Get max value along the NEB
-pot_max = -np.Inf
+pot_max = -np.inf
 print('')
 print('#      E(kcal/mol)')
 for i in range(n_max):

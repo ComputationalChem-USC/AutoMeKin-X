@@ -75,14 +75,14 @@ if [ -f tsdir${tag}_${molecule}/min_diss.inp ]; then
       #EMN only one fragment
       form="$(cat ${molecule}.xyz | FormulaPROD.sh )"
       nfrag=$(awk '{print $1}' tmp_nf)
-      if [ $nfrag -gt 1 ]; then 
+      if [ $nfrag -gt 1 ]; then
          echo Fragmented minimum
-         continue 
+         continue
       fi
       #EMN --> provisional
       nchan=$(Heuristics.py 0 1)
       re='^[0-9]+$'
-      if ! [[ $nchan =~ $re ]] ; then 
+      if ! [[ $nchan =~ $re ]] ; then
          echo " Error: No neighbors for " $nchan
          exit 1
       fi
@@ -94,19 +94,23 @@ if [ -f tsdir${tag}_${molecule}/min_diss.inp ]; then
       fi
       echo "Found $nchan possible channels"
 ###EMN
-      doparallel "runbarless.sh {1} $molecule $cwd $e0" "$(seq 1 $nchan)"
+      doparallel "runbarless.sh {1} $molecule $cwd $e0" "$(seq 1 $nchan)" || true
       #echo "threshold $emaxts kcal/mol"
       for chan in $(seq $nchan)
       do
          l1=$(awk 'NR=='$chan'{print $2+1}' tsdir${tag}_${molecule}/ts_bonds.inp)
          l2=$(awk 'NR=='$chan'{print $3+1}' tsdir${tag}_${molecule}/ts_bonds.inp)
          echo "Channel ${chan}: breakage of bond ${l1}-${l2}"
-         if [ $(awk 'BEGIN{a=0};/Abort/{a=1};END{print a}' batch${chan}/amk.log ) -eq 1 ]; then 
+         if [ ! -f batch${chan}/amk.log ]; then
+            echo "Channel ${chan}: timed out or failed before producing output, skipping"
+            continue
+         fi
+         if [ $(awk 'BEGIN{a=0};/Abort/{a=1};END{print a}' batch${chan}/amk.log ) -eq 1 ]; then
             grep -B1 Abort batch${chan}/amk.log | awk 'NR==1'
-            continue 
+            continue
          fi
          if [ -f batch${chan}/prod.xyz ]; then
-            cat batch${chan}/prod.xyz | awk '{if(NR==2) {print ""} else print $1,$2,$3,$4}' > tmp_geom 
+            cat batch${chan}/prod.xyz | awk '{if(NR==2) {print ""} else print $1,$2,$3,$4}' > tmp_geom
             formula0="$(cat tmp_geom | FormulaPROD.sh )"
             formula=$(echo "$formula0" | sed 's@ + @+@g')
             nfrag=$(awk '{print $1}' tmp_nf)
@@ -114,7 +118,7 @@ if [ -f tsdir${tag}_${molecule}/min_diss.inp ]; then
             if [ $nfrag -eq 1 ]; then continue ; fi
             echo "$formula" > tmp_formula
             tag_prod.py tmp_geom | sed 's@-0.000@0.000@g' > tmp_tag
-            tagpr="$(cat tmp_tag)" 
+            tagpr="$(cat tmp_tag)"
             paste tmp_formula tmp_tag > barrless_tag.log
 
             if [ -f tsdir${tag}_${molecule}/PRODs/PRlist_tags_barr.log ]; then
@@ -132,35 +136,35 @@ if [ -f tsdir${tag}_${molecule}/min_diss.inp ]; then
                new=1
             fi
 #check energy also compared to threshold 
-            pe=$(awk '/Product energy rel/{print $(NF-1)}' batch${chan}/amk.log )     
-            pea=$(awk '/Product energy abs/{print $(NF-1)}' batch${chan}/amk.log )     
+            pe=$(awk '/Product energy rel/{print $(NF-1)}' batch${chan}/amk.log )
+            pea=$(awk '/Product energy abs/{print $(NF-1)}' batch${chan}/amk.log )
 #add barrierless channel in file RXN_barrless
-            if [ $new -eq 1 ] &&  (( $(echo "$pe < $emaxts" |bc -l) )); then 
+            if [ $new -eq 1 ] &&  (( $(echo "$pe < $emaxts" |bc -l) )); then
 #Check with NEB that there is not saddle point (it might have gone unnoticed
 #If a saddle is found--> the route is discarded and the TS is included in tslist and also in tslist_from_barrless
 #This new TS is not updated in FINAL_LL_molecule, but it will be taken into account at HL
-               cd batch${chan} && neb_barrless.py > neb_barrless.log 
-               cd $cwd  
+               cd batch${chan} && neb_barrless.py > neb_barrless.log
+               cd $cwd
                if [ -f batch${chan}/ts.log ]; then
                   if [ $(awk 'BEGIN{f=0};/TS optimized and added/{f=1};END{print f}' batch${chan}/ts.log) -eq 1 ]; then
                      echo "A saddle point has been found in this path" 
                      echo "This saddle point was found connecting MIN $i with $formula0" 
                      tail -1 tsdir${tag}_${molecule}/tslist >> tsdir${tag}_${molecule}/tslist_from_barrless
-                     continue 
-                  fi 
+                     continue
+                  fi
                fi
                echo "***** BARRIERLESS RXN. ENERGY OF FRAGMENTS: $pe *****"
                nbl=$((nbl+1))
 #xyz in min_diss file
                geom="$(cat tmp_geom | awk 'NR>2{print $0}')"
                id=$(sqlite3 tsdir${tag}_${molecule}/PRODs/prod.db "select max(id) from prod")
-               id=$((id+1)) 
+               id=$((id+1))
                zpe=0
                g=0
                freq=""
                name=PR${id}_min_diss_${i}_${chan}
                sqlite3 tsdir${tag}_${molecule}/PRODs/prod.db "insert into prod (natom,name,energy,zpe,g,geom,freq,formula) values ($natom,'$name',$pea,$zpe,$g,'$geom','$freq','$formula0');"
-               echo "PROD ${id} min_diss_${i}_${chan}.rxyz" >> tsdir${tag}_${molecule}/PRODs/PRlist 
+               echo "PROD ${id} min_diss_${i}_${chan}.rxyz" >> tsdir${tag}_${molecule}/PRODs/PRlist
                echo $pea $formula "$tagpr"  >> tsdir${tag}_${molecule}/PRODs/PRlist_tags.log
                echo "$nbl $pe MIN $i <-->  PROD ${id}" >> tsdir${tag}_${molecule}/KMC/RXN_barrless
             else
@@ -175,7 +179,7 @@ if [ -f tsdir${tag}_${molecule}/min_diss.inp ]; then
    npr=0
    for pr in $(awk '{print $2}' tsdir${tag}_${molecule}/PRODs/PRlist_tags.log)
    do
-      npr=$((npr+1)) 
+      npr=$((npr+1))
       form="$(echo $pr | sed 's@+@ + @g')"
       echo "PROD $npr "$form"" >> tsdir${tag}_${molecule}/KMC/RXN_barrless
    done
