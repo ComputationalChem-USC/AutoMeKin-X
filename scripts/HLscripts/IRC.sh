@@ -116,6 +116,11 @@ do
       if [ $(awk 'BEGIN{c=0};/ORCA TERMINATED NORMALLY/{c=1};/ERROR !!!/{c=0};END{print c}' ${tsdirhl}/IRC/ircf_${i}.log) -eq 0 ]; then rm -rf ${tsdirhl}/IRC/ircf_${i}.* ; fi
       if [ $(awk 'BEGIN{c=0};/ORCA TERMINATED NORMALLY/{c=1};/ERROR !!!/{c=0};END{print c}' ${tsdirhl}/IRC/ircr_${i}.log) -eq 0 ]; then rm -rf ${tsdirhl}/IRC/ircr_${i}.* ; fi
     fi
+  elif [ "$program_hl" = "mlip" ]; then
+    if [ -f ${tsdirhl}/IRC/ircf_${i}.log ] && [ -f ${tsdirhl}/IRC/ircr_${i}.log ]; then
+      if [ $(awk '/AMK_TERMINATED_NORMALLY/{c=1}END{print c+0}' ${tsdirhl}/IRC/ircf_${i}.log) -eq 0 ]; then rm -rf ${tsdirhl}/IRC/ircf_${i}.* ; fi
+      if [ $(awk '/AMK_TERMINATED_NORMALLY/{c=1}END{print c+0}' ${tsdirhl}/IRC/ircr_${i}.log) -eq 0 ]; then rm -rf ${tsdirhl}/IRC/ircr_${i}.* ; fi
+    fi
   fi
   if [ -f ${tsdirhl}/IRC/ircf_${i}.log ] && [ -f ${tsdirhl}/IRC/ircr_${i}.log ]; then
     echo "IRC completed for $i"
@@ -144,6 +149,13 @@ do
        irc_direction=backward
        orca_input
        echo -e "insert or ignore into gaussian values (NULL,'ircr_$i','$inp_hl');\n.quit" | sqlite3 ${tsdirhl}/IRC/inputs.db
+    elif [ "$program_hl" = "mlip" ]; then
+       geo="$(get_geom_mlip.sh $tsdirhl/${i}.log)"
+       inp_hl="$(printf "$natom\n\n$geo")"
+       ((m=m+1))
+       echo -e "insert or ignore into gaussian values (NULL,'ircf_$i','$inp_hl');\n.quit" | sqlite3 ${tsdirhl}/IRC/inputs.db
+       ((m=m+1))
+       echo -e "insert or ignore into gaussian values (NULL,'ircr_$i','$inp_hl');\n.quit" | sqlite3 ${tsdirhl}/IRC/inputs.db
     else
        ${program_hl}_input
     fi
@@ -152,5 +164,9 @@ done
 # Perform m parallel calculations
 echo Performing a total of $m irc calculations
 if [ $m -gt 0 ]; then
-   doparallel "runIRC.sh {1} $tsdirhl $program_hl" "$(seq $m)"
+   if [ "$program_hl" = "mlip" ]; then
+      mlip_calc.py batch irc ${tsdirhl}/IRC $mlip_model $models_dir $charge $mult
+   else
+      doparallel "runIRC.sh {1} $tsdirhl $program_hl" "$(seq $m)"
+   fi
 fi

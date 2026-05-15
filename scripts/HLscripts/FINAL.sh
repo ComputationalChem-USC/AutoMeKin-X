@@ -33,7 +33,11 @@ elif [ $rate -eq 1 ]; then
 fi
 ##
 
-final=FINAL_HL_${molecule}
+if [ "$program_hl" = "mlip" ]; then
+   final=FINAL_ML_${molecule}
+else
+   final=FINAL_HL_${molecule}
+fi
 ####
 rm -rf $final 
 mkdir $final 
@@ -269,6 +273,10 @@ do
        get_NM_orca_molden.sh ${tsdirhl}/${f}.log  $mdir/TS$number
     elif [ "$program_hl" = "qcore" ] ; then
        cp ${tsdirhl}/freq_${f}.molden  $mdir/TS${number}.molden
+    elif [ "$program_hl" = "mlip" ] ; then
+       if [ -f ${tsdirhl}/${f}.molden ]; then
+          cp ${tsdirhl}/${f}.molden  $mdir/TS${number}.molden
+       fi
     fi
 done
 
@@ -287,7 +295,11 @@ do
           get_NM_orca_molden.sh ${tsdirhl}/${f}.log  $mdir/MIN$number
        elif [ "$program_hl" = "qcore" ] ; then
           cp ${tsdirhl}/freq_${f}.molden  $mdir/MIN${number}.molden
-       fi 
+       elif [ "$program_hl" = "mlip" ] ; then
+          if [ -f ${tsdirhl}/${f}.molden ]; then
+             cp ${tsdirhl}/${f}.molden  $mdir/MIN${number}.molden
+          fi
+       fi
     else
        if [ "$program_hl" = "g09" ] || [ "$program_hl" = "g16" ]; then
           get_NM_g09_molden.sh ${tsdirhl}/IRC/${f}.log  $mdir/MIN${number}
@@ -295,6 +307,10 @@ do
           get_NM_orca_molden.sh ${tsdirhl}/IRC/${f}.log  $mdir/MIN${number}
        elif [ "$program_hl" = "qcore" ] ; then
           cp ${tsdirhl}/IRC/freq_${f}.molden  $mdir/MIN${number}.molden
+       elif [ "$program_hl" = "mlip" ] ; then
+          if [ -f ${tsdirhl}/IRC/${f}.molden ]; then
+             cp ${tsdirhl}/IRC/${f}.molden  $mdir/MIN${number}.molden
+          fi
        fi
     fi
 done

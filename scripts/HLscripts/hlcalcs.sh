@@ -98,7 +98,7 @@ tt=$( echo "$end - $start" | bc -l | awk '{printf "%4.0f",$1}')
 echo "   time: $tt s"
 
 if [ "$barrierless" = "yes" ]; then
-   if [ "$program_hl" = "g09" ] || [ "$program_hl" = "g16" ] || [ "$program_hl" = "orca" ]; then
+   if [ "$program_hl" = "g09" ] || [ "$program_hl" = "g16" ] || [ "$program_hl" = "orca" ] || [ "$program_hl" = "mlip" ]; then
       echo "   Addding barrless procs"
       start=$(date +%s.%N)
       LOCATE_BARRIERLESS.sh >/dev/null
@@ -116,7 +116,11 @@ tt=$( echo "$end - $start" | bc -l | awk '{printf "%4.0f",$1}')
 echo "   time: $tt s"
 
 echo ""
-echo "Making final folder: FINAL_HL_${molecule}"
+if [ "$program_hl" = "mlip" ]; then
+   echo "Making final folder: FINAL_ML_${molecule}"
+else
+   echo "Making final folder: FINAL_HL_${molecule}"
+fi
 FINAL.sh >/dev/null
 echo ""
 echo "END OF THE CALCULATIONS"

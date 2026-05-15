@@ -35,6 +35,8 @@ if [ "$program_hl" = "g09" ] || [ "$program_hl" = "g16" ]; then
    check_g09
 elif [ "$program_hl" = "orca" ]; then
    check_orca
+elif [ "$program_hl" = "mlip" ]; then
+   : # model file already validated in hl_print
 fi
 
 min0=${molecule}
@@ -111,6 +113,8 @@ do
        g09_input
     elif [ "$program_hl" = "orca" ]; then
        orca_input
+    elif [ "$program_hl" = "mlip" ]; then
+       inp_hl="$(printf "$natom\n\n$geo")"
     else
        ${program_hl}_input
     fi
@@ -128,6 +132,8 @@ if [ -f $tsdirhl/min0.log ]; then
       calc=$(awk 'BEGIN{calc=1;nt=0};/ORCA TERMINATED NORMALLY/{++nt};/ERROR !!!/{calc=0};END{if(nt==1) calc=0;print calc}' $tsdirhl/min0.log)
    elif [ "$program_hl" = "qcore" ]; then
       calc=$(awk 'BEGIN{calc=1;ncheck=0};/Energy=/{if(NF==2) ncheck+=1};/Lowest/{ncheck+=1};/Error/{calc=0};END{if(ncheck==2) calc=0;print calc}' $tsdirhl/min0.log)
+   elif [ "$program_hl" = "mlip" ]; then
+      calc=$(awk 'BEGIN{calc=1};/AMK_TERMINATED_NORMALLY/{calc=0};END{print calc}' $tsdirhl/min0.log)
    fi
 else
    calc=1
@@ -148,6 +154,8 @@ else
       g09_input
    elif [ "$program_hl" = "orca" ]; then
       orca_input
+   elif [ "$program_hl" = "mlip" ]; then
+      inp_hl="$(printf "$natom\n\n$geo")"
    else
       ${program_hl}_input
    fi
@@ -157,5 +165,10 @@ fi
 
 echo Performing a total of $m ts opt calculations
 if [ $m -gt 0 ]; then
-   doparallel "runTS.sh {1} $tsdirhl $program_hl" "$(seq $m)"
+   if [ "$program_hl" = "mlip" ]; then
+      # Load model once and process all TSs sequentially to avoid GPU OOM
+      mlip_calc.py batch tsopt $tsdirhl $mlip_model $models_dir $charge $mult
+   else
+      doparallel "runTS.sh {1} $tsdirhl $program_hl" "$(seq $m)"
+   fi
 fi

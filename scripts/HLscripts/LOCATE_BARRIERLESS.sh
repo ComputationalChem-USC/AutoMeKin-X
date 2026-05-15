@@ -99,7 +99,11 @@ done
 ##run the sp calcs
 echo We now run the sp calcs
 if [ $nbl -gt 0 ]; then
-   doparallel "runMIN.sh {1} ${tsdirhl}/IRC/DISS $program_hl" "$(seq $nbl)"
+   if [ "$program_hl" = "mlip" ]; then
+      mlip_calc.py batch minopt ${tsdirhl}/IRC/DISS $mlip_model $models_dir $charge $mult
+   else
+      doparallel "runMIN.sh {1} ${tsdirhl}/IRC/DISS $program_hl" "$(seq $nbl)"
+   fi
 fi
 
 rm -rf tmp_geomf_* tmp_geomr_*

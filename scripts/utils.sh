@@ -72,7 +72,7 @@ function slurm {
 
 #  SRUN="srun --exclusive -N1 -n1 --mem-per-cpu=$MEMPERCORE"
 #  SRUN="srun -N1 -n1 --mem=$(( $MEMPERCORE*$corespertask )) -c $corespertask --cpu_bind=none"
-   SRUN="srun --exclusive -N1 -n1 --mem=$(( $MEMPERCORE*$corespertask )) -c $corespertask"
+   SRUN="srun --exclusive -N1 -n1 --mem=$(( $MEMPERCORE*$corespertask )) -c $corespertask --mpi=none"
    runningtasks=$SLURM_NTASKS
 }
 
@@ -377,8 +377,11 @@ function read_input {
       HLstring0="$(awk '{if($1=="HighLevel") print $3}' $inputfile)"
    elif [ "$program_hl" = "orca" ]; then
       HLstring0="$(awk '{if($1=="HighLevel") print $3}' $inputfile)"
+   elif [ "$program_hl" = "mlip" ]; then
+      mlip_model="$(awk '{if($1=="HighLevel") print tolower($3)}' $inputfile)"
+      HLstring0="$mlip_model"
    else
-      echo HighLevel value is $program_hl , and it should be qcore, g09, g16 or orca
+      echo HighLevel value is $program_hl , and it should be qcore, g09, g16, orca or mlip
       exit 1
    fi
    #######################################################
@@ -386,12 +389,13 @@ function read_input {
    reduce=$(awk 'BEGIN{red=-1};{if($1=="HL_rxn_network") {if($2=="complete") red=0;if($2=="reduced" && NF==3) red=$3}};END{print red}' $inputfile)
    #noHLcalc=$(echo $HLstring | awk 'BEGIN{nc=0};{nc=NF};END{print nc}')
    noHLcalc=$(echo $HLstring | awk 'BEGIN{nc=0};{nc=NF};END{print nc}')
-   # For ORCA, always single job regardless of method string
+   # For ORCA and MLIP, always single job regardless of method string
    if [ "$program_hl" = "orca" ]; then noHLcalc=1; fi
+   if [ "$program_hl" = "mlip" ]; then noHLcalc=1; fi
    ###########cambiando_esto#####################
    #IRCpoints=$(awk 'BEGIN{if("'$program_hl'"~/g[01][96]/)np=100;if("'$program_hl'"=="qcore")np=500};{if($1=="IRCpoints") np=$2};END{print np}' $inputfile)
    #######################por_esto####################
-   IRCpoints=$(awk 'BEGIN{if("'$program_hl'"~/g[01][96]/)np=100;if("'$program_hl'"=="qcore")np=500;if("'$program_hl'"=="orca")np=20};{if($1=="IRCpoints") np=$2};END{print np}' $inputfile)
+   IRCpoints=$(awk 'BEGIN{if("'$program_hl'"~/g[01][96]/)np=100;if("'$program_hl'"=="qcore")np=500;if("'$program_hl'"=="orca")np=20;if("'$program_hl'"=="mlip")np=100};{if($1=="IRCpoints") np=$2};END{print np}' $inputfile)
    iop=$(awk '{if($1=="iop") {$1="";print $0}}' $inputfile)
    mem=$(awk 'BEGIN{mem=1};{if($1=="Memory") mem=$2};END{print mem}' $inputfile)
    pseudo=$(awk '{if($1=="pseudo") print "pseudo=read" }' $inputfile)
@@ -418,6 +422,12 @@ function read_input {
    fi
 ###some few constants
    nfrag_th=0.005
+   if [ "$program_hl" = "mlip" ]; then
+      models_dir="${AMK}/models"
+      export mlip_model models_dir
+      # MLIP does not compute Gibbs free energy; force microcanonical (E+ZPE) sorting
+      rate=1
+   fi
 }
 
 ##Function to run the association complexes 
@@ -532,6 +542,23 @@ elif [ "$program_hl" = "g16" ];then
    then
       echo ""
       echo "g16 does not seem to be installed"
+      echo "Aborting..."
+      exit
+   fi
+elif [ "$program_hl" = "mlip" ];then
+   if [ "$mlip_model" = "uma" ]; then
+      model_file="${AMK}/models/uma-m-1p1.pt"
+   elif [ "$mlip_model" = "mace" ]; then
+      model_file="${AMK}/models/MACE-OFF23_large.model"
+   else
+      echo ""
+      echo "Unknown MLIP model: $mlip_model. Supported: uma, mace"
+      echo "Aborting..."
+      exit
+   fi
+   if [ ! -f "$model_file" ]; then
+      echo ""
+      echo "MLIP model file not found: $model_file"
       echo "Aborting..."
       exit
    fi
@@ -1429,6 +1456,15 @@ $geor
 #############END###############################
 ###############################################
 
+function mlip_input {
+   local inp="$(printf "%s\n\n%s" "$natom" "$geof")"
+   if [ -z "${diss:-}" ]; then
+      echo -e "insert or ignore into gaussian values (NULL,'minf_$i','$inp');\n.quit" | sqlite3 ${tsdirhl}/IRC/inputs.db
+   else
+      echo -e "insert or ignore into gaussian values (NULL,'min_diss_$i','$inp');\n.quit" | sqlite3 ${tsdirhl}/IRC/DISS/inputs.db
+   fi
+}
+###############################################
 
 function check_g09 {
 if [ "program_hl" = "g09" ]; then
@@ -1512,6 +1548,13 @@ elif [ "$program_hl" = "qcore" ];then
    geom="$(awk 'NR>2{print $0}' $tsdirhl/${name}_opt.xyz)"
    freq="$(awk '/Freq/{for(i=1;i<=1000;i++) {getline;if(NF>1) exit;print $1}}' $tsdirhl/${name}.log)"
    sigma=1
+elif [ "$program_hl" = "mlip" ];then
+   energy=$(get_energy_mlip.sh $tsdirhl/${name}.log)
+   zpe=$(get_ZPE_mlip.sh $tsdirhl/${name}.log)
+   g=0
+   geom="$(get_geom_mlip.sh $tsdirhl/${name}.log)"
+   freq="$(get_freq_mlip.sh $tsdirhl/${name}.log)"
+   sigma=1
 fi
 }
 ################################################################
@@ -1581,6 +1624,15 @@ elif [ "$program_hl" = "qcore" ]; then
       g=$(awk '/Gibbs free energy/{print $4}' $i)
       freq="$(awk '/Freq/{for(i=1;i<=1000;i++) {getline;if(NF>1) exit;print $1}}' $i)"
       sqlite3 ${tsdirhl}/MINs/minhl.db "insert or ignore into minhl (natom,name,energy,zpe,g,geom,freq) values ($natom,'$name',$energy,$zpe,$g,'$geom','$freq');"
+   fi
+elif [ "$program_hl" = "mlip" ]; then
+   energy=$(get_energy_mlip.sh $i)
+   geom="$(get_geom_mlip.sh $i)"
+   if [ $name != "min0" ]; then
+      zpe=$(get_ZPE_mlip.sh $i)
+      g=0
+      freq="$(get_freq_mlip.sh $i)"
+      sqlite3 ${tsdirhl}/MINs/minhl.db "insert or ignore into minhl (natom,name,energy,zpe,g,geom,freq,sigma) values ($natom,'$name',$energy,$zpe,$g,'$geom','$freq',1);"
    fi
 fi
 }
@@ -1776,6 +1828,19 @@ elif [ "$program_hl" = "orca" ]; then
    END{if(nt==1 && fok==1) ok=1; print ok}' $tsdirhl/${name}.log)
 elif [ "$program_hl" = "qcore" ]; then
    ok=$(awk 'BEGIN{ok=0};/Freq/{getline;f1=$1;getline;f2=$1;if(f1<0 && f2>0) ok=1};END{print ok}' $tsdirhl/${name}.log)
+elif [ "$program_hl" = "mlip" ]; then
+   ok=$(awk 'BEGIN{fok=0;ok=0;nt=0;nf=0;first=0;second=0;flag=0}
+   /AMK_TERMINATED_NORMALLY/{nt=1}
+   /VIBRATIONAL FREQUENCIES/{flag=1; next}
+   flag && /cm\*\*-1/{
+      freq=$2+0
+      val=freq; if(val<0) val=-val
+      if(val<50) next
+      nf++
+      if(nf==1){first=freq; next}
+      if(nf==2){second=freq; flag=0}
+   }
+   END{if(first<0 && second>0) fok=1; if(nt==1 && fok==1) ok=1; print ok}' $tsdirhl/${name}.log)
 fi
 }
 ##################################################
@@ -1802,6 +1867,8 @@ if [ -f ${tsdirhl}/${name}.log ]; then
       calc=$(awk 'BEGIN{calc=1;nt=0};/ORCA TERMINATED NORMALLY/{++nt};/ERROR !!!/{calc=0};END{if(nt==1) calc=0;print calc}' $tsdirhl/${name}.log)
    elif [ "$program_hl" = "qcore" ];then
       calc=$(awk 'BEGIN{calc=1;ncheck=0};/Energy=/{if(NF==2) ncheck+=1};/Lowest/{ncheck+=1};/Error/{calc=0};END{if(ncheck==2) calc=0;print calc}' $tsdirhl/${name}.log)
+   elif [ "$program_hl" = "mlip" ];then
+      calc=$(awk 'BEGIN{calc=1};/AMK_TERMINATED_NORMALLY/{calc=0};END{print calc}' $tsdirhl/${name}.log)
    fi
 else
    calc=1
@@ -1850,6 +1917,13 @@ elif [ "$program_hl" = "orca" ]; then
    END{if(nt==1 && fok==1) ok=1; print ok}' $i)
 elif [ "$program_hl" = "qcore" ]; then
    ok=$(awk 'BEGIN{ok=0};/Freq/{getline;f1=$1;getline;f2=$1;if(f1>0 && f2>0) ok=1};END{print ok}' $i)
+elif [ "$program_hl" = "mlip" ]; then
+   ok=$(awk 'BEGIN{ok=0;nt=0;np=0}
+   /AMK_TERMINATED_NORMALLY/{nt=1}
+   /VIBRATIONAL FREQUENCIES/{flag=1; next}
+   flag && /cm\*\*-1/{f=$2+0; if(f>50) np++; if(np==2){ok=1}}
+   /^$/{flag=0}
+   END{if(nt==0) ok=0; print ok}' $i)
 fi
 #Force min0 to be ok
 if [ $ok -eq 0 ] && [ $name = "min0" ]; then ok=1 ; fi
@@ -1889,6 +1963,9 @@ if [ -f $tsdirhl/IRC/minf_$i.log ] && [ -f $tsdirhl/IRC/minr_$i.log ]; then
    elif [ "$program_hl" = "qcore" ]; then
       calc1=$(awk 'BEGIN{calc=1};/Energy=/{if(NF==2) calc=0};END{print calc}' $tsdirhl/IRC/minf_$i.log)
       calc2=$(awk 'BEGIN{calc=1};/Energy=/{if(NF==2) calc=0};END{print calc}' $tsdirhl/IRC/minr_$i.log)
+   elif [ "$program_hl" = "mlip" ]; then
+      calc1=$(awk 'BEGIN{calc=1};/AMK_TERMINATED_NORMALLY/{calc=0};END{print calc}' $tsdirhl/IRC/minf_$i.log)
+      calc2=$(awk 'BEGIN{calc=1};/AMK_TERMINATED_NORMALLY/{calc=0};END{print calc}' $tsdirhl/IRC/minr_$i.log)
    fi
    if [ $calc1 -eq 0 ] && [ $calc2 -eq 0 ]; then
       calc=0
@@ -1963,6 +2040,9 @@ elif [ "$program_hl" = "orca" ]; then
 elif [ "$program_hl" = "qcore" ]; then
    awk 'NR>2{print $0}' ${tsdirhl}/IRC/${i}_forward_last.xyz > tmp_geomf_$i
    awk 'NR>2{print $0}' ${tsdirhl}/IRC/${i}_reverse_last.xyz > tmp_geomr_$i
+elif [ "$program_hl" = "mlip" ]; then
+   awk 'NR>2{print $0}' ${tsdirhl}/IRC/ircf_${i}_last.xyz > tmp_geomf_$i
+   awk 'NR>2{print $0}' ${tsdirhl}/IRC/ircr_${i}_last.xyz > tmp_geomr_$i
 fi
 geof="$(cat tmp_geomf_$i)"
 geor="$(cat tmp_geomr_$i)"

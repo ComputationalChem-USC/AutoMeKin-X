@@ -50,6 +50,8 @@ do
        get_minfminr_g09.sh $i
     elif [ "$program_hl" = "orca" ]; then
        get_minfminr_orca.sh $i
+    elif [ "$program_hl" = "mlip" ]; then
+       get_minfminr_mlip.sh $i
     else
        get_minfminr_${program_hl}.sh $i
     fi
@@ -57,7 +59,11 @@ do
 done
 echo Performing a total of $n opt calculations
 if [ $n -gt 0 ]; then
-   doparallel "runMIN.sh {1} ${tsdirhl}/IRC $program_hl" "$(seq $n)"
+   if [ "$program_hl" = "mlip" ]; then
+      mlip_calc.py batch minopt ${tsdirhl}/IRC $mlip_model $models_dir $charge $mult
+   else
+      doparallel "runMIN.sh {1} ${tsdirhl}/IRC $program_hl" "$(seq $n)"
+   fi
 fi
 
 

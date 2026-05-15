@@ -52,6 +52,8 @@ do
          calc=$(awk 'BEGIN{e=1};/ORCA TERMINATED NORMALLY/{e=0};/ERROR !!!/{e=1};END{print e}' $file)
       elif [ "$program_hl" = "qcore" ];then
          calc=$(awk 'BEGIN{e=0};/Error/{e=1};END{print e}' $file)
+      elif [ "$program_hl" = "mlip" ];then
+         calc=$(awk 'BEGIN{e=1};/AMK_TERMINATED_NORMALLY/{e=0};END{print e}' $file)
        fi
 ###If error pick the smallest label isomer without error
        if [ $calc -eq 1 ]; then
@@ -64,6 +66,8 @@ do
                 calc=$(awk 'BEGIN{e=1};/Normal termi/{e=0};/Error termi/{e=1};END{print e}' $i)
              elif [ "$program_hl" = "qcore" ];then
                 calc=$(awk 'BEGIN{e=0};/Error/{e=1};END{print e}' $i)
+             elif [ "$program_hl" = "mlip" ];then
+                calc=$(awk 'BEGIN{e=1};/AMK_TERMINATED_NORMALLY/{e=0};END{print e}' $i)
              fi
              nn=$(basename $i .log | awk 'BEGIN{FS="-"};{print $2}')
              if [ $calc -eq 0 ]; then
@@ -103,7 +107,7 @@ do
           etemp=$(awk 'NR==1{print $2}' $file)
           zpetemp=$(awk '/ZPE/{printf "%12.2f",$2*627.51}' $file)
           zpeok=$(awk 'BEGIN{ok=0};/ZPE/{if($2>0) ok=1};END{print ok}' $file)
-          echo $etemp >> ee$ext 
+          echo $etemp >> ee$ext
           nameg=$(basename $file .log | sed 's@\.@_@g;s@-@_@g')
           if [ -f ${tsdirhl}/PRODs/CALC/${nameg}_opt.xyz ];then
              awk 'NR>2{print $0}' ${tsdirhl}/PRODs/CALC/${nameg}_opt.xyz > tmp_geom
@@ -112,10 +116,21 @@ do
           fi
           com.sh > geom0$ext
           awk '{print $1,$2+5*'${sign[$j]}',$3,$4}' geom0$ext >> geom$ext
-          echo $zpetemp >> zpe$ext 
+          echo $zpetemp >> zpe$ext
           if (( $(echo "$zpetemp > 0.1" |bc -l) )); then
              awk '/Freq/{for(i=1;i<=1000;i++) {getline;if(NF>1) exit;print $1}}' $file >> freq$ext
           fi
+          sigma=1
+       elif [ "$program_hl" = "mlip" ]; then
+          etemp=$(get_energy_mlip.sh $file)
+          zpetemp=$(get_ZPE_mlip.sh $file)
+          zpeok=$(awk '/Zero point energy/{ok=1}END{print ok+0}' $file)
+          echo $etemp >> ee$ext
+          get_geom_mlip.sh $file > tmp_geom
+          com.sh > geom0$ext
+          awk '{print $1,$2+5*'${sign[$j]}',$3,$4}' geom0$ext >> geom$ext
+          echo $zpetemp >> zpe$ext
+          get_freq_mlip.sh $file >> freq$ext
           sigma=1
        fi
 ##create temp file tmp_rxyz from sqlite tables
@@ -131,6 +146,8 @@ do
           if (( $(echo "$zpetemp > 0.1" |bc -l) )); then
              awk '/Freq/{for(i=1;i<=1000;i++) {getline;if(NF>1) exit;print sqrt($1*$1)}}' $file >> tmp_rxyz
           fi
+       elif [ "$program_hl" = "mlip" ]; then
+          get_freq_mlip.sh $file | awk '{printf "%10.0f\n",sqrt($1*$1)}' >> tmp_rxyz
        fi
 ###Calculate g using saulo's thermochem.py 
 #If it does not optimize -- > continue
@@ -158,10 +175,17 @@ do
           if [ -z "$mult" ]; then
              mult="$(awk '/Total Spin           S/{print $NF*2+1}' $file)"
           fi
+       elif [ "$program_hl" = "mlip" ]; then
+          mult=$(basename $file .log | sed 's/.*\.m\([0-9]*\)-.*/\1/')
+          if [ -z "$mult" ] || [ "$mult" = "$(basename $file .log)" ]; then mult=1 ; fi
        else
           mult="$(awk '/Multiplicity/{print $NF}' $file)"
        fi
-       thermochem.py tmp_rxyz $temperature hl $mult | awk '/Thermal correction to Gib/{getline;getline;print $3}' >> gcorr$ext
+       if [ "$program_hl" = "mlip" ]; then
+          echo "0" >> gcorr$ext
+       else
+          thermochem.py tmp_rxyz $temperature hl $mult | awk '/Thermal correction to Gib/{getline;getline;print $3}' >> gcorr$ext
+       fi
     done
     e=$(awk '{e+=$1};END{printf "%14.9f\n",e}' ee$ext)
     gcorr=$(awk '{e+=$1};END{printf "%14.9f\n",e}' gcorr$ext)

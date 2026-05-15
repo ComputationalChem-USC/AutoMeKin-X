@@ -57,7 +57,7 @@ n=0
 nmin=0
 npro=0
 nrm=0
-cp $tsdirhl/min0* $tsdirhl/IRC
+find $tsdirhl -maxdepth 1 -name "min0*" -type f -exec cp {} $tsdirhl/IRC/ \;
 for i in $(ls ${tsdirhl}/IRC/min*.log)
 do 
   ((n=n+1))
@@ -110,6 +110,8 @@ do
         xyz=${tsdirhl}/IRC/${name}.xyz
      fi
      geom="$(awk 'NR>2{print $0}' $xyz)"
+  elif [ "$program_hl" = "mlip" ]; then
+     geom="$(get_geom_mlip.sh ${tsdirhl}/IRC/${name}.log)"
   fi
 #Now we screen the list to rename duplicates
   echo $natom > mingeom

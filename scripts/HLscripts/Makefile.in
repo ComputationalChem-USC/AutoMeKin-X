@@ -271,7 +271,10 @@ dist_bin_SCRIPTS = get_energy_g09_CCSDT.sh \
 	    RXN_NETWORK.sh SORT.sh TS.sh hlcalcs.sh \
             FINAL.sh get_NM_g09_molden.sh compare_frags.sh \
             reduce_RXNet.py REMOVE_TS.sh linked_paths.py \
-            LOCATE_BARRIERLESS.sh
+            LOCATE_BARRIERLESS.sh \
+            get_energy_mlip.sh get_ZPE_mlip.sh get_geom_mlip.sh \
+            get_freq_mlip.sh get_G_mlip.sh get_sigma_mlip.sh \
+            get_minfminr_mlip.sh
 
 all: all-am
 
