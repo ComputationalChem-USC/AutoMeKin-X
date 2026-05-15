@@ -5,5 +5,5 @@ dist_share_DATA=atsymb diagram_template0 diagram_template1 dynamics_template \
 	sp_template thermo_template ts_templatefast ts_templateslow \
 	amk_build g09_test.dat orca_test.inp pop_template.gnu header.pdf \
         grad MD opt optfreq opt_frozen opt_thermo optTS scan_tors \
-        optts_hl optmin_hl grad_hl prod_hl
+        optts_hl optmin_hl grad_hl prod_hl logo.ansi.txt
 
