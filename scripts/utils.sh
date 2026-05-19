@@ -555,7 +555,7 @@ elif [ "$program_hl" = "mlip" ];then
    if [ "$mlip_model" = "uma" ]; then
       model_file="${AMK}/models/uma-m-1p1.pt"
    elif [ "$mlip_model" = "mace" ]; then
-      model_file="${AMK}/models/MACE-OFF23_large.model"
+      model_file="${AMK}/models/MACE-omol-0-extra-large-1024.model"
    else
       echo ""
       echo "Unknown MLIP model: $mlip_model. Supported: uma, mace"

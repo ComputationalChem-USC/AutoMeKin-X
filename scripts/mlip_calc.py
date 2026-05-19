@@ -65,7 +65,7 @@ def load_calculator(model_name, models_dir):
 
     elif model_name == 'mace':
         from mace.calculators import MACECalculator
-        model_path = models_path / 'MACE-OFF23_large.model'
+        model_path = models_path / 'MACE-omol-0-extra-large-1024.model'
         if not model_path.exists():
             raise FileNotFoundError(f"MACE model not found: {model_path}")
         return MACECalculator(
