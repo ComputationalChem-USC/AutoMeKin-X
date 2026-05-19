@@ -79,12 +79,14 @@ do
          fi
       elif [ "$program_hl" = "orca" ]; then
          if [ $charge_calc -eq 1 ]; then
+            # FIX(2026-05-19): removed extra getline before loop (caused off-by-one, reading "---" separator
+            # as atom line 0, shifting all subsequent reads by 1 and crashing on short-field lines);
+            # changed atomidx=$(NF-2)+0 to $1 (NF-2 was extracting the element symbol field, always 0 in arithmetic)
             charge=$(awk '{if(NR == FNR) {n[NR]=$1;++naf}}
-            /CHELPG Charges/{q=0;getline;getline
+            /CHELPG Charges/{q=0;getline
             for(i=1;i<='$natom';i++){getline
                for(j=1;j<=naf;j++){
-                  # ORCA atom index starts at 0
-                  atomidx=$(NF-2)+0
+                  atomidx=$1
                   if(atomidx==n[j]-1) q+=$NF
                }
             }  }
@@ -102,12 +104,6 @@ do
          /Charges/{q=0
          for(i=1;i<='$natom';i++){getline; for(j=1;j<=naf;j++){if(i==n[j]) q+=$1} }  }
          END{printf "%.0f\n",q}'  tmp_Frag$j ${logdir}/${name0}.log | sed 's/-0/0/')
-      elif [ "$program_hl" = "mlip" ]; then
-         if [ $charge_calc -eq 1 ] && [ $j -eq 1 ]; then
-            charge=$charge_t
-         else
-            charge=0
-         fi
       fi
       echo charge: $charge
 
@@ -127,12 +123,14 @@ do
             }
           }' tmp_Frag$j ${logdir}/${name0}.log )
       elif [ "$program_hl" = "orca" ]; then
-         # Extract spin populations from Mulliken analysis in ORCA
-         # If no unpaired electrons found, use noue+1 as default
+         # FIX(2026-05-19): removed extra getline before loop (same off-by-one as CHELPG parser above);
+         # changed atom index comparison from (i-1==n[j]-1) to ($1==n[j]-1) so that the 0-based
+         # ORCA atom index is read directly from the line rather than inferred from the loop counter
+         # (loop counter was already off by one after the extra getline consumed atom 0 outside the loop)
          mult=$(awk '{if(NR == FNR) {n[NR]=$1;++naf}}
-         /MULLIKEN ATOMIC SPIN POPULATIONS/{spin=0;getline;getline
+         /MULLIKEN ATOMIC SPIN POPULATIONS/{spin=0;getline
             for(i=1;i<='$natom';i++){getline
-               for(j=1;j<=naf;j++){if(i-1==n[j]-1) spin+=$NF}
+               for(j=1;j<=naf;j++){if($1==n[j]-1) spin+=$NF}
             }
          }
          END{
@@ -144,8 +142,6 @@ do
          if [ -z "$mult" ]; then mult=$(echo "$noue + 1" | bc) ; fi
       elif [ "$program_hl" = "qcore" ]; then
          mult=1
-      elif [ "$program_hl" = "mlip" ]; then
-         mult=$(( noue + 1 ))
       fi
       echo mult: $mult 
       name="$(awk '{if(NR==2) print $1}' tmp_frag$j.log)"
@@ -168,8 +164,6 @@ do
             if [ $(awk 'BEGIN{c=0};/Job /{c=1};/ZPE/{c=1};END{print c}' ${dir}/${nn}.log) -eq 1 ]; then calc=0 ; fi
          elif [ "$program_hl" = "orca" ]; then
             if [ $(awk 'BEGIN{c=0};/ORCA TERMINATED NORMALLY/{c=1};/ERROR !!!/{c=0};END{print c}' ${dir}/${nn}.log) -eq 1 ]; then calc=0 ; fi
-         elif [ "$program_hl" = "mlip" ]; then
-            if [ $(awk '/AMK_TERMINATED_NORMALLY/{c=1}END{print c+0}' ${dir}/${nn}.log) -eq 1 ]; then calc=0 ; fi
          fi
       fi
 ###calc only if the frag is not repeated and/or the calc is not completed
@@ -187,9 +181,6 @@ do
          elif [ "$program_hl" = "qcore" ]; then
             calc=prod
             ${program_hl}_input
-         elif [ "$program_hl" = "mlip" ]; then
-            natom_frag=$(awk 'NF==4{c++}END{print c}' tmp_frag$j.xyz)
-            inp_hl="$(printf "%s\ncharge=%s mult=%s\n%s" "$natom_frag" "$charge" "$mult" "$(awk 'NF==4{print}' tmp_frag$j.xyz)")"
          fi
       else
          inp_hl="$(echo salir)"
@@ -214,11 +205,7 @@ done
 #submit the calcs
 echo Performing a total of $m opt calculations
 if [ $m -gt 0 ]; then
-   if [ "$program_hl" = "mlip" ]; then
-      mlip_calc.py batch minopt $dir $mlip_model $models_dir $charge_t 1
-   else
-      doparallel "runTS.sh {1} $dir $program_hl" "$(seq $m)"
-   fi
+   doparallel "runTS.sh {1} $dir $program_hl" "$(seq $m)"
 fi
 
 
