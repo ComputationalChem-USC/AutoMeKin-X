@@ -7,8 +7,9 @@ trap 'err_report $LINENO' ERR
 trap cleanup EXIT INT
 exe=$(basename $0)
 cwd=$PWD
-#Enter HL or LL 
+#Enter HL or LL
 tag=$1
+tsdirtag=${2:-$tag}
 
 if [ -f amk.dat ];then
    inputfile=amk.dat
@@ -19,7 +20,7 @@ fi
 #reading input
 read_input
 ###
-tsdir=tsdir${tag}_${molecule}
+tsdir=tsdir${tsdirtag}_${molecule}
 final=FINAL_${tag}_${molecule}
 rxnet=${final}/RXNet.cg
 if [ $rate -eq 0 ]; then

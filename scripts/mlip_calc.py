@@ -29,10 +29,12 @@ from ase.units import Hartree, kcal, mol
 import torch
 torch.set_num_threads(1)
 
-# IRC parameters (from workflow_irc.py)
+# IRC parameters
 IRC_DX    = 0.1    # amu^0.5 * Å, step size along IRC
 IRC_ETA   = 1e-4
 IRC_GAMMA = 0.4
+IRC_FMAX  = 0.01   # eV/Å — looser than TS opt to walk the full IRC path
+IRC_STEPS = 1000
 
 
 def get_device():
@@ -95,11 +97,23 @@ def run_minopt(atoms, name, fmax=0.005, steps=500):
 
 
 def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
-            fmax=0.005, steps=500):
+            fmax=IRC_FMAX, steps=IRC_STEPS):
     from sella import IRC
+
+    # Sella IRC checks gradient_converged() before taking any step, so a
+    # well-converged TS (forces < fmax) would stop immediately at step 0.
+    # Force at least one kick along the imaginary mode before allowing
+    # convergence to be declared.
+    class _IRC(IRC):
+        def gradient_converged(self, gradient):
+            if self.nsteps == 0:
+                return False
+            return super().gradient_converged(gradient)
+
     print(f"  IRC {direction} with Sella (dx={dx}, fmax={fmax} eV/Ang, max_steps={steps})",
           flush=True)
-    dyn = IRC(atoms, trajectory=f'{name}.traj', dx=dx, eta=eta, gamma=gamma)
+    dyn = _IRC(atoms, trajectory=f'{name}.traj', dx=dx, eta=eta, gamma=gamma,
+               keep_going=True)
     converged = dyn.run(fmax=fmax, steps=steps, direction=direction)
     print(f"  Steps: {dyn.nsteps}, Converged: {converged}", flush=True)
     return converged
@@ -316,19 +330,13 @@ def process_one(name, xyz_content, calc, calctype, model_name, charge=0, mult=1)
         print(f"  {name}: ERROR - {e}", flush=True)
 
 
-def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
-    """Load model once, process all entries from inputs.db sequentially."""
-    print(f"AMK_MLIP batch: {calctype} | model={model_name} | charge={charge} | mult={mult}",
-          flush=True)
-
+def _batch_worker(args):
+    """Worker function: processes a subset of entries on one GPU."""
+    gpu_id, rows, calctype, workdir, model_name, models_dir, charge, mult = args
+    # Set GPU visibility before any CUDA initialization
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
     calc = load_calculator(model_name, models_dir)
-    print(f"Model loaded on {get_device().upper()}", flush=True)
-
-    db_path = os.path.join(workdir, 'inputs.db')
-    con = sqlite3.connect(db_path)
-    rows = con.execute("SELECT name, input FROM gaussian ORDER BY id").fetchall()
-    con.close()
-
+    print(f"  [GPU {gpu_id}] model loaded, {len(rows)} entries", flush=True)
     old_cwd = os.getcwd()
     os.chdir(workdir)
     try:
@@ -339,6 +347,46 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
             process_one(name, xyz_content, calc, entry_calctype, model_name, charge, mult)
     finally:
         os.chdir(old_cwd)
+
+
+def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
+    """Process all entries from inputs.db; distributes across all available GPUs."""
+    import multiprocessing as mp
+
+    print(f"AMK_MLIP batch: {calctype} | model={model_name} | charge={charge} | mult={mult}",
+          flush=True)
+
+    db_path = os.path.join(workdir, 'inputs.db')
+    con = sqlite3.connect(db_path)
+    rows = con.execute("SELECT name, input FROM gaussian ORDER BY id").fetchall()
+    con.close()
+
+    ngpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+
+    if ngpus <= 1:
+        calc = load_calculator(model_name, models_dir)
+        print(f"Model loaded on {get_device().upper()}", flush=True)
+        old_cwd = os.getcwd()
+        os.chdir(workdir)
+        try:
+            for name, xyz_content in rows:
+                if xyz_content == 'salir':
+                    continue
+                entry_calctype = _dispatch_calctype(name, calctype)
+                process_one(name, xyz_content, calc, entry_calctype, model_name, charge, mult)
+        finally:
+            os.chdir(old_cwd)
+    else:
+        print(f"Using {ngpus} GPUs in parallel", flush=True)
+        # Interleaved split for better load balancing
+        chunks = [rows[i::ngpus] for i in range(ngpus)]
+        args_list = [
+            (i, chunks[i], calctype, workdir, model_name, models_dir, charge, mult)
+            for i in range(ngpus)
+        ]
+        ctx = mp.get_context('spawn')
+        with ctx.Pool(processes=ngpus) as pool:
+            pool.map(_batch_worker, args_list)
 
     print("\nBatch complete.", flush=True)
 

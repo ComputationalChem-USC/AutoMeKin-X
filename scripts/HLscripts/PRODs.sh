@@ -142,6 +142,8 @@ do
          if [ -z "$mult" ]; then mult=$(echo "$noue + 1" | bc) ; fi
       elif [ "$program_hl" = "qcore" ]; then
          mult=1
+      elif [ "$program_hl" = "mlip" ]; then
+         mult=$((noue + 1))
       fi
       echo mult: $mult 
       name="$(awk '{if(NR==2) print $1}' tmp_frag$j.log)"
@@ -164,6 +166,8 @@ do
             if [ $(awk 'BEGIN{c=0};/Job /{c=1};/ZPE/{c=1};END{print c}' ${dir}/${nn}.log) -eq 1 ]; then calc=0 ; fi
          elif [ "$program_hl" = "orca" ]; then
             if [ $(awk 'BEGIN{c=0};/ORCA TERMINATED NORMALLY/{c=1};/ERROR !!!/{c=0};END{print c}' ${dir}/${nn}.log) -eq 1 ]; then calc=0 ; fi
+         elif [ "$program_hl" = "mlip" ]; then
+            if [ $(awk 'BEGIN{c=0};/AMK_TERMINATED_NORMALLY/{c=1};END{print c}' ${dir}/${nn}.log) -eq 1 ]; then calc=0 ; fi
          fi
       fi
 ###calc only if the frag is not repeated and/or the calc is not completed
@@ -181,6 +185,10 @@ do
          elif [ "$program_hl" = "qcore" ]; then
             calc=prod
             ${program_hl}_input
+         elif [ "$program_hl" = "mlip" ]; then
+            fnatom=$(awk '{if(NF==4) ++n}END{print n}' tmp_frag$j.xyz)
+            geo="$(awk '{if(NF==4) print $0};END{print ""}' tmp_frag$j.xyz)"
+            inp_hl="$(printf "$fnatom\ncharge=$charge mult=$mult\n$geo")"
          fi
       else
          inp_hl="$(echo salir)"
@@ -205,7 +213,11 @@ done
 #submit the calcs
 echo Performing a total of $m opt calculations
 if [ $m -gt 0 ]; then
-   doparallel "runTS.sh {1} $dir $program_hl" "$(seq $m)"
+   if [ "$program_hl" = "mlip" ]; then
+      mlip_calc.py batch minopt $dir $mlip_model $models_dir $charge $mult
+   else
+      doparallel "runTS.sh {1} $dir $program_hl" "$(seq $m)"
+   fi
 fi
 
 

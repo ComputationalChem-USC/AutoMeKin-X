@@ -393,7 +393,11 @@ if [ -f $kmcfile ]; then
    #   mv diagram.gnu ${final}/Energy_profile.gnu
    #fi
 fi
-nx.sh HL
+if [ "$program_hl" = "mlip" ]; then
+   nx.sh ML HL
+else
+   nx.sh HL
+fi
 ###Change format of RXNet and RXNet.cg
 format_rxnet.sh RXNet0 RXNet0 > ${final}/RXNet
 if [ -f RXNetcg0 ] ; then format_rxnet.sh RXNetcg0 RXNetcg0 > ${final}/RXNet.cg ; fi
@@ -402,6 +406,7 @@ if [ -f ${tsdirhl}/KMC/RXN_barrless2 ]; then
    format_rxnet.sh ${tsdirhl}/KMC/RXN_barrless2 ${tsdirhl}/KMC/RXN_barrless2 > ${final}/RXNet.barrless
    #we now screen barrless file to ensure there is no corresponding channels with a barrier and that the min is connected
    rm -rf tmp_minprod tmp_rxnetbarrless_screened tmp_minprod.barrless tmp_rxnetbarrless_screened tmp_ref_barr
+   touch tmp_ref_barr
    sed 's@PR@PR @g;s@:@ @g' ${final}/RXNet.cg |awk '{if($6=="PR") print $4,$7}' >tmp_minprod
    n=0
    for p in $(awk '{print $2}' tmp_minprod)
@@ -471,7 +476,9 @@ cd ${final}
 #   #gnuplot <Energy_profile.gnu>Energy_profile.pdf
 #fi
 ##Create csv file
-awk '/Time/,0 {for(i=1;i<=NF-1;i++) printf "%s, ",$i;print $NF}' kinetics$postb > kinetics.csv
+if [ -f kinetics$postb ]; then
+   awk '/Time/,0 {for(i=1;i<=NF-1;i++) printf "%s, ",$i;print $NF}' kinetics$postb > kinetics.csv
+fi
 ##End of create csv file
 #####################################################^
 rm -rf population${postb}.gnu pop_data* kinetics$postb
