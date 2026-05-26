@@ -1363,9 +1363,17 @@ end"
       inp_hl="$(echo -e "$cal\n* xyz $charge $mult\n$geo\n*")"
 
    elif [ "$calc" = "min" ]; then
-      cal="! $levelc_orca Opt TightOpt TightSCF $freq_keyword
+      natom_frag=$(echo "$geo" | awk 'NF==4{n++} END{print n+0}')
+      if [ "$natom_frag" -eq 1 ]; then
+         # Single atom: opt/freq not needed; SP gives the energy directly
+         cal="! $levelc_orca SP TightSCF
 %maxcore $mem_mb
 %pal nprocs $nprocs end"
+      else
+         cal="! $levelc_orca Opt TightOpt TightSCF $freq_keyword
+%maxcore $mem_mb
+%pal nprocs $nprocs end"
+      fi
       inp_hl="$(echo -e "$cal\n* xyz $charge $mult\n$geo\n*")"
 
    elif [ "$calc" = "irc" ]; then

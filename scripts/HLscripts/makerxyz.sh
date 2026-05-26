@@ -162,10 +162,13 @@ do
           continue
        fi
 #case 2. energy is obtained but zpe is not obtained
-       if [ $zpeok -eq 0 ]; then 
-          echo Warning: $file is not optimized  >> frag_warnings
-          echo Warning: $file is not optimized  
-          echo "" >> frag_warnings
+       if [ $zpeok -eq 0 ] || [ -z "$zpetemp" ]; then
+          natom_frag=$(awk 'NF==4{n++} END{print n+0}' tmp_geom)
+          if [ "$natom_frag" -ne 1 ]; then
+             echo Warning: $file is not optimized  >> frag_warnings
+             echo Warning: $file is not optimized
+             echo "" >> frag_warnings
+          fi
           zpetemp=0
           echo "0" >> gcorr$ext
           continue
