@@ -289,22 +289,32 @@ def process_one(name, xyz_content, calc, calctype, model_name, charge=0, mult=1)
         atoms.calc = calc
 
         if calctype == 'tsopt':
-            converged          = run_tsopt(atoms, name)
-            energy_eV          = atoms.get_potential_energy()
-            freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
-            write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
-                      converged)
-            write_molden_file(atoms, vib, log_path)
-            vib.clean()
+            if len(atoms) == 1:
+                # Single atom: no optimization or frequencies needed
+                energy_eV = atoms.get_potential_energy()
+                write_log(log_path, model_name, calctype, atoms, [], 0.0, energy_eV, True)
+            else:
+                converged          = run_tsopt(atoms, name)
+                energy_eV          = atoms.get_potential_energy()
+                freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
+                write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
+                          converged)
+                write_molden_file(atoms, vib, log_path)
+                vib.clean()
 
         elif calctype == 'minopt':
-            converged          = run_minopt(atoms, name)
-            energy_eV          = atoms.get_potential_energy()
-            freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
-            write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
-                      converged)
-            write_molden_file(atoms, vib, log_path)
-            vib.clean()
+            if len(atoms) == 1:
+                # Single atom: Sella requires ≥2 atoms; just do a single-point energy
+                energy_eV = atoms.get_potential_energy()
+                write_log(log_path, model_name, calctype, atoms, [], 0.0, energy_eV, True)
+            else:
+                converged          = run_minopt(atoms, name)
+                energy_eV          = atoms.get_potential_energy()
+                freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
+                write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
+                          converged)
+                write_molden_file(atoms, vib, log_path)
+                vib.clean()
 
         elif calctype in ('ircf', 'ircr'):
             direction = 'forward' if calctype == 'ircf' else 'reverse'
@@ -407,22 +417,30 @@ def run_single(calctype, xyzfile, model_name, models_dir, charge, mult):
         atoms.calc = calc
 
         if calctype == 'tsopt':
-            converged          = run_tsopt(atoms, name)
-            energy_eV          = atoms.get_potential_energy()
-            freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
-            write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
-                      converged)
-            write_molden_file(atoms, vib, log_path)
-            vib.clean()
+            if len(atoms) == 1:
+                energy_eV = atoms.get_potential_energy()
+                write_log(log_path, model_name, calctype, atoms, [], 0.0, energy_eV, True)
+            else:
+                converged          = run_tsopt(atoms, name)
+                energy_eV          = atoms.get_potential_energy()
+                freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
+                write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
+                          converged)
+                write_molden_file(atoms, vib, log_path)
+                vib.clean()
 
         elif calctype == 'minopt':
-            converged          = run_minopt(atoms, name)
-            energy_eV          = atoms.get_potential_energy()
-            freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
-            write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
-                      converged)
-            write_molden_file(atoms, vib, log_path)
-            vib.clean()
+            if len(atoms) == 1:
+                energy_eV = atoms.get_potential_energy()
+                write_log(log_path, model_name, calctype, atoms, [], 0.0, energy_eV, True)
+            else:
+                converged          = run_minopt(atoms, name)
+                energy_eV          = atoms.get_potential_energy()
+                freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
+                write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
+                          converged)
+                write_molden_file(atoms, vib, log_path)
+                vib.clean()
 
         else:
             raise ValueError(f"Unknown calctype '{calctype}'")
