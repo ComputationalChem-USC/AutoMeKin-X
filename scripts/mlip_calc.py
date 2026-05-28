@@ -58,25 +58,13 @@ def load_calculator(model_name, models_dir):
     models_path = Path(models_dir)
 
     if model_name == 'uma':
-        import torch
-        from omegaconf import OmegaConf
         from fairchem.core import FAIRChemCalculator, pretrained_mlip
+        from omegaconf import OmegaConf
         model_path = models_path / 'uma-m-1p1.pt'
+        refs_path  = models_path / 'uma-m-1p1_atom_refs.yaml'
         if not model_path.exists():
             raise FileNotFoundError(f"UMA model not found: {model_path}")
-        # Extract per-dataset atomic reference energies from the checkpoint so
-        # that single-atom systems (e.g. bare H) get the correct energy via the
-        # lookup table instead of crashing with "no atom_refs available".
-        ckpt = torch.load(str(model_path), weights_only=False, map_location='cpu')
-        atom_refs = {}
-        for task in ckpt.tasks_config:
-            td = OmegaConf.to_container(task, resolve=True)
-            elem_cfg = td.get('element_references', {})
-            if not elem_cfg:
-                continue
-            vals    = elem_cfg['element_references']['_args_'][0]
-            dataset = td['name'].replace('_energy', '')
-            atom_refs[f'{dataset}_elem_refs'] = {z: v for z, v in enumerate(vals)}
+        atom_refs = OmegaConf.load(refs_path) if refs_path.exists() else None
         pred_unit = pretrained_mlip.load_predict_unit(str(model_path), device=device,
                                                       atom_refs=atom_refs)
         return FAIRChemCalculator(pred_unit, task_name='omol')
