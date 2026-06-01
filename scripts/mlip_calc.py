@@ -30,7 +30,7 @@ import torch
 torch.set_num_threads(1)
 
 # IRC parameters
-IRC_DX    = 0.1    # amu^0.5 * Å, step size along IRC
+IRC_DX    = 0.08   # amu^0.5 * Å, step size along IRC
 IRC_ETA   = 1e-4
 IRC_GAMMA = 0.4
 IRC_FMAX  = 0.01   # eV/Å — looser than TS opt to walk the full IRC path
