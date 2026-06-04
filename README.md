@@ -17,6 +17,7 @@
 - [Installation and documentation](#inst)
 - [Simple examples in Colab](#colab)
 - [Web interface](#web)
+- [ML methods comparison — MEA gallery](#gallery)
 
 ---
 
@@ -75,6 +76,25 @@ conda env create -f automekin.yml
 ## Web interface <a name="web"></a>
 
 Submit simple examples directly at [https://rxnkin.usc.es/amk/](https://rxnkin.usc.es/amk/).
+
+---
+
+## ML methods comparison — MEA gallery <a name="gallery"></a>
+
+An interactive gallery comparing four levels of theory on the full reaction network of monoethanolamine (MEA, C₂H₇NO) — 980 Tier-1 matched transition states across four tabs:
+
+| Tab | Description |
+|---|---|
+| **HL ↔ UMA** | DFT (wB97X-D3/def2-TZVP) vs. Meta FAIR UMA |
+| **HL ↔ MACE** | DFT vs. MACE-OFF23 |
+| **HL ↔ DELTA** | DFT vs. r²SCAN-3c corrected with a delta-ML model |
+| **HL ∩ UMA ∩ MACE ∩ DELTA** | 174 Tier-1 reactions identified at all four levels |
+
+Each card shows a side-by-side 3D rendering of the left endpoint, transition state, and right endpoint for every method. Clicking a card opens an interactive viewer (drag to rotate, scroll to zoom) with forward/reverse barriers and reaction enthalpies vs. CCSD(T)-F12.
+
+### 👉 [Open MEA gallery](https://htmlpreview.github.io/?https://raw.githubusercontent.com/OmarRodriguezLopez1398/AutoMeKin2026/main/ML_IMP_EXAMPLES/mea_gallery.html)
+
+> The gallery is a fully self-contained HTML file (no external dependencies). It can also be downloaded from [`ML_IMP_EXAMPLES/mea_gallery.html`](ML_IMP_EXAMPLES/mea_gallery.html) and opened locally.
 
 ---
 
