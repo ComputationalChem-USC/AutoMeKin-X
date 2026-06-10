@@ -8,6 +8,7 @@ nav_order: 6
 
 The following works employ AutoMeKin or its algorithms:
 
+- [Combu. Flame 2026](https://www.sciencedirect.com/science/article/pii/S0010218026003329?casa_token=crVzNaseLYgAAAAA:PofttxSsB0IWJjkRvAxwLdTPT1TfVQBlClrndTe5r60gKXu66oQyBQMoPB3EQy9hHFnnegXoWw)
 - [Book Chapter 2026](https://www.sciencedirect.com/science/chapter/edited-volume/abs/pii/B9780443265969000144?via%3Dihub)
 - [PCCP 2026](https://pubs.rsc.org/en/content/articlelanding/2026/cp/d6cp00606j)
 - [CPC 2026](https://chemistry-europe.onlinelibrary.wiley.com/doi/10.1002/cphc.202500844)
