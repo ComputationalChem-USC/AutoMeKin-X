@@ -8,7 +8,7 @@ nav_order: 6
 
 The following works employ AutoMeKin or its algorithms:
 
-- [sm. struct. 2025](https://onlinelibrary.wiley.com/doi/10.1002/sstr.70504?fbclid=IwY2xjawSpoN1leHRuA2FlbQIxMABicmlkETFFdEVic1JyU2dTMldaenJMc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHrKmLCweCP3sBNgEg0ELJ6ssIrRN13Qxm037lWEb5rlBVJt5TjUCxAahza7t_aem_n_PDmYLvNdAh2a51BqlVrw)
+- [sm. struct. 2026](https://onlinelibrary.wiley.com/doi/10.1002/sstr.70504?fbclid=IwY2xjawSpoN1leHRuA2FlbQIxMABicmlkETFFdEVic1JyU2dTMldaenJMc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHrKmLCweCP3sBNgEg0ELJ6ssIrRN13Qxm037lWEb5rlBVJt5TjUCxAahza7t_aem_n_PDmYLvNdAh2a51BqlVrw)
 - [Combus. Flame 2026](https://www.sciencedirect.com/science/article/abs/pii/S0010218026003329)
 - [Book Chapter 2026](https://www.sciencedirect.com/science/chapter/edited-volume/abs/pii/B9780443265969000144?via%3Dihub)
 - [PCCP 2026](https://pubs.rsc.org/en/content/articlelanding/2026/cp/d6cp00606j)
