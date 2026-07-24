@@ -8,7 +8,7 @@ nav_order: 6
 
 The following works employ AutoMeKin or its algorithms:
 
-- [Fuel_2](https://www.sciencedirect.com/science/article/pii/S0016236126025007)
+- [Fuel_2 2026](https://www.sciencedirect.com/science/article/pii/S0016236126025007)
 - [Pharm 2026](https://www.mdpi.com/1424-8247/19/7/1108)
 - [Fuel_1 2026](https://www.sciencedirect.com/science/article/pii/S0016236126021307#b0360)
 - [sm. struct. 2026](https://onlinelibrary.wiley.com/doi/10.1002/sstr.70504?fbclid=IwY2xjawSpoN1leHRuA2FlbQIxMABicmlkETFFdEVic1JyU2dTMldaenJMc3J0YwZhcHBfaWQQMjIyMDM5MTc4ODIwMDg5MgABHrKmLCweCP3sBNgEg0ELJ6ssIrRN13Qxm037lWEb5rlBVJt5TjUCxAahza7t_aem_n_PDmYLvNdAh2a51BqlVrw)
