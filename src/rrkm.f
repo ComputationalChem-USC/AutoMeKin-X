@@ -112,7 +112,7 @@ c
 
  
       read(5,*) nts
-      allocate(nfrect(nreac))
+      allocate(nfrect(nts))
       if(rrkm==2) then
          read(5,*) npoints
          allocate(r(npoints),ezpe0v(npoints))

@@ -1,4 +1,4 @@
-AC_INIT([amk], [2021], [emilio.nunez@usc.es],[amk-SOURCE])
+AC_INIT([amk],[2021],[emilio.nunez@usc.es],[amk-SOURCE])
 AM_INIT_AUTOMAKE
 AC_CONFIG_SRCDIR([src/bbfs.f90])
 AC_PREFIX_DEFAULT([$HOME/AC_PACKAGE_NAME-AC_PACKAGE_VERSION])
@@ -58,7 +58,7 @@ AC_DEFINE_UNQUOTED(AMK_BUILD, ["`svnversion -n`"], [repository svn version])
 fi
 
 AC_CONFIG_FILES([Makefile])
-AC_OUTPUT([ src/Makefile \
+AC_CONFIG_FILES([ src/Makefile \
 	    src/HL/Makefile\
 	     scripts/Makefile\
 	     scripts/HLscripts/Makefile\
@@ -67,6 +67,7 @@ AC_OUTPUT([ src/Makefile \
 	     modules/Makefile\
 	     examples/Makefile \
 	     share/Makefile])
+AC_OUTPUT
 
 AC_MSG_NOTICE([
 

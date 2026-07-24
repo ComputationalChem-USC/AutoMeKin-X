@@ -133,6 +133,40 @@ def run_frequencies(atoms, vib_name):
     return freqs, zpe_eV, vib  # caller must call vib.clean() after Molden writing
 
 
+def _n_trans_rot_modes(atoms):
+    """Number of near-zero translation+rotation modes in the Hessian spectrum:
+    5 for a linear molecule (3 trans + 2 rot), 6 otherwise (3 trans + 3 rot).
+    ASE always returns 3N modes, regardless of N."""
+    if len(atoms) == 2:
+        return 5
+    moments = atoms.get_moments_of_inertia()
+    if min(moments) < 1e-6 * max(moments):
+        return 5
+    return 6
+
+
+def _mode_freq_cm(freq):
+    """Signed cm^-1 value for one ASE frequency (imaginary modes -> negative)."""
+    if hasattr(freq, 'imag') and abs(freq.imag) > 1e-6:
+        return -freq.imag
+    return freq.real if hasattr(freq, 'real') else float(freq)
+
+
+def _vibrational_indices(freqs, atoms):
+    """Indices of freqs that are genuine vibrations (or reaction coordinates),
+    excluding the n_rt translation/rotation modes. Selecting by SMALLEST
+    |frequency| rather than by fixed position is required for TS structures:
+    ASE sorts by eigenvalue ascending, so an imaginary reaction-coordinate mode
+    (large negative eigenvalue) lands at index 0 -- *before* the near-zero
+    trans/rot modes -- while for a minimum the near-zero modes are already
+    first. Magnitude-based selection handles both cases and any linear/2-atom
+    edge case uniformly."""
+    n_rt = _n_trans_rot_modes(atoms)
+    order = sorted(range(len(freqs)), key=lambda i: abs(_mode_freq_cm(freqs[i])))
+    drop = set(order[:n_rt])
+    return [i for i in range(len(freqs)) if i not in drop]
+
+
 def write_molden_file(atoms, vib, log_path):
     """Write Molden file with geometry and normal modes alongside the log."""
     atobohr   = 1.889726
@@ -140,25 +174,21 @@ def write_molden_file(atoms, vib, log_path):
     freqs     = vib.get_frequencies()
     symbols   = atoms.get_chemical_symbols()
     positions = atoms.get_positions()
-    nfreq     = len(freqs)
+    keep      = _vibrational_indices(freqs, atoms)
 
     with open(molden_path, 'w') as f:
         f.write('[Molden Format]\n')
         f.write('[FREQ]\n')
-        for freq in freqs:
-            if hasattr(freq, 'imag') and freq.imag > 1e-3:
-                f_cm = -freq.imag
-            else:
-                f_cm = freq.real if hasattr(freq, 'real') else float(freq)
-            f.write(f'{f_cm:6.1f}\n')
+        for i in keep:
+            f.write(f'{_mode_freq_cm(freqs[i]):6.1f}\n')
         f.write('       \n')
         f.write('[FR-COORD]\n')
         for sym, pos in zip(symbols, positions):
             f.write(f'{sym} {pos[0]*atobohr:.6f} {pos[1]*atobohr:.6f} {pos[2]*atobohr:.6f}\n')
         f.write('\n')
         f.write('[FR-NORM-COORD]\n')
-        for i in range(6, nfreq):
-            f.write(f'Vibration {i - 5}\n')
+        for vib_num, i in enumerate(keep, start=1):
+            f.write(f'Vibration {vib_num}\n')
             mode = vib.get_mode(i)
             for disp in mode:
                 f.write(f'{disp[0]*atobohr:.6f} {disp[1]*atobohr:.6f} {disp[2]*atobohr:.6f}\n')
