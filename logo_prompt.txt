@@ -1,0 +1,72 @@
+AutoMeKin-X cover / logo image-generation prompts
+==================================================
+
+Contexto: el logo actual (logo.png) es una superficie de energia
+potencial (PES) en malla azul oscuro con el texto "Auto MeKin". Estos
+prompts mantienen esa identidad visual y anaden los elementos que
+distinguen la version en desarrollo (AutoMeKin-X / AutoMeKin2026):
+soporte de potenciales ML (UMA, MACE), y la marca "X"/2026.
+
+
+1) PROMPT PRINCIPAL (banner README, 16:9)
+------------------------------------------
+
+A modern, minimalist scientific logo/banner for "AutoMeKin-X", the
+next-generation development version of the AutoMeKin reaction-discovery
+software. Deep navy-blue color palette (#1a2f6e range), clean vector
+wireframe style on a white/transparent background.
+
+Main element: a smooth 3D wireframe mesh surface representing a
+potential energy surface (PES), with one clear saddle-point / transition
+state dip in the middle of the ridge -- same visual language as a
+topographic energy landscape. Overlaid subtly on the mesh, a sparse
+molecular graph: a few atom-nodes connected by bonds/edges, echoing a
+reaction network diagram, with one node highlighted to suggest a
+transition state.
+
+Woven into the mesh on the right side, a small cluster of interconnected
+nodes resembling a neural network graph (representing the machine-learning
+interatomic potentials, UMA and MACE), rendered in the same wireframe
+line style so it reads as an extension of the PES rather than a separate
+icon -- symbolizing ML potentials replacing/augmenting quantum chemistry
+calculations.
+
+Typography: "AutoMeKin" in a clean modern sans-serif or the same
+elegant script used in the original logo, in matching navy blue, with a
+small superscript or subscript "X" (or "2026") after the wordmark to mark
+the development version -- subtle, not dominant.
+
+Style: flat vector illustration, thin line weights, technical/scientific
+diagram aesthetic (like a journal graphical abstract), no gradients
+except a soft highlight on the mesh peak, no photorealism, no drop
+shadows, no clutter. Wide aspect ratio (1200x630 or 16:9), transparent
+background, high resolution, suitable as a GitHub README banner.
+
+
+2) VARIANTE CUADRADA (logo / favicon)
+--------------------------------------
+
+Same visual concept as above but cropped to a square 1:1 composition:
+just the wireframe PES-with-saddle-point plus the small embedded
+neural-network node cluster, no text, deep navy blue on transparent
+background, centered, simple enough to remain legible at small sizes
+(64x64 favicon).
+
+
+3) NEGATIVE PROMPT (si la herramienta lo soporta)
+---------------------------------------------------
+
+no photorealistic rendering, no 3D render shading, no clutter, no
+multiple colors, no gradients beyond a single soft highlight, no
+extra text, no watermark, no cartoon style, no glossy/plastic look
+
+
+Notas
+-----
+- La malla PES con el punto de silla es la identidad visual ya
+  existente del logo: se mantiene intacta.
+- El cluster tipo "red neuronal" representa los potenciales ML
+  (UMA/MACE) integrado en el mismo estilo de lineas, no como icono
+  aparte, para no romper la coherencia visual.
+- La marca "X"/"2026" junto al wordmark senala que es la version en
+  desarrollo, sin rehacer el logo desde cero.
