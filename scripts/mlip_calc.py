@@ -23,6 +23,7 @@ import sqlite3
 import traceback
 from pathlib import Path
 
+import numpy as np
 from ase.io import read
 from ase.units import Hartree, kcal, mol
 
@@ -133,54 +134,75 @@ def run_frequencies(atoms, vib_name):
     return freqs, zpe_eV, vib  # caller must call vib.clean() after Molden writing
 
 
-def _n_trans_rot_modes(atoms):
-    """Number of near-zero translation+rotation modes in the Hessian spectrum:
-    5 for a linear molecule (3 trans + 2 rot), 6 otherwise (3 trans + 3 rot).
-    ASE always returns 3N modes, regardless of N."""
-    if len(atoms) == 2:
-        return 5
-    moments = atoms.get_moments_of_inertia()
-    if min(moments) < 1e-6 * max(moments):
-        return 5
-    return 6
+def _project_trans_rot(atoms, hessian_2d):
+    """Return (hessian, n_rt): the Cartesian Hessian with translation and
+    rotation projected out via the Eckart conditions, and the number of
+    modes removed (5 for a linear molecule, 6 otherwise).
 
+    A raw finite-difference Hessian's 6 lowest-|eigenvalue| modes are not a
+    reliable stand-in for "translation+rotation": they mix with genuine
+    low-frequency (or imaginary, for a TS) vibrations whenever the geometry
+    has residual forces, which is common with ML potentials (noisier than
+    DFT). Explicitly building the mass-weighted translation/rotation basis
+    from the geometry+masses and projecting it out of the Hessian before
+    diagonalizing removes that ambiguity -- this is what QC codes such as
+    Gaussian/ORCA do internally before reporting frequencies."""
+    natoms  = len(atoms)
+    masses  = atoms.get_masses()
+    pos_c   = atoms.get_positions() - atoms.get_center_of_mass()
+    sqrt_m  = np.sqrt(np.repeat(masses, 3))
+    Hmw     = hessian_2d / np.outer(sqrt_m, sqrt_m)
 
-def _mode_freq_cm(freq):
-    """Signed cm^-1 value for one ASE frequency (imaginary modes -> negative)."""
-    if hasattr(freq, 'imag') and abs(freq.imag) > 1e-6:
-        return -freq.imag
-    return freq.real if hasattr(freq, 'real') else float(freq)
+    D = np.zeros((6, 3 * natoms))
+    for a in range(3):
+        v = np.zeros((natoms, 3))
+        v[:, a] = 1.0
+        D[a] = (v * np.sqrt(masses)[:, None]).flatten()
+    for a in range(3):
+        e = np.zeros(3)
+        e[a] = 1.0
+        v = np.cross(e, pos_c)
+        D[3 + a] = (v * np.sqrt(masses)[:, None]).flatten()
 
-
-def _vibrational_indices(freqs, atoms):
-    """Indices of freqs that are genuine vibrations (or reaction coordinates),
-    excluding the n_rt translation/rotation modes. Selecting by SMALLEST
-    |frequency| rather than by fixed position is required for TS structures:
-    ASE sorts by eigenvalue ascending, so an imaginary reaction-coordinate mode
-    (large negative eigenvalue) lands at index 0 -- *before* the near-zero
-    trans/rot modes -- while for a minimum the near-zero modes are already
-    first. Magnitude-based selection handles both cases and any linear/2-atom
-    edge case uniformly."""
-    n_rt = _n_trans_rot_modes(atoms)
-    order = sorted(range(len(freqs)), key=lambda i: abs(_mode_freq_cm(freqs[i])))
-    drop = set(order[:n_rt])
-    return [i for i in range(len(freqs)) if i not in drop]
+    _, S, Vt = np.linalg.svd(D, full_matrices=False)
+    n_rt = int(np.sum(S > 1e-8 * S.max()))  # 5 for linear molecules, else 6
+    Vr = Vt[:n_rt]
+    P = np.eye(3 * natoms) - Vr.T @ Vr
+    Hmw_proj = P @ Hmw @ P
+    return Hmw_proj * np.outer(sqrt_m, sqrt_m), n_rt
 
 
 def write_molden_file(atoms, vib, log_path):
-    """Write Molden file with geometry and normal modes alongside the log."""
-    atobohr   = 1.889726
+    """Write Molden file with geometry and normal modes alongside the log.
+
+    Frequencies/modes come from an Eckart-projected Hessian (see
+    _project_trans_rot) rather than ASE's raw spectrum, so that translation
+    and rotation are removed exactly instead of guessed by magnitude."""
+    from ase.vibrations.data import VibrationsData
+    from ase.units import invcm
+
+    atobohr     = 1.889726
     molden_path = log_path.replace('.log', '.molden')
-    freqs     = vib.get_frequencies()
-    symbols   = atoms.get_chemical_symbols()
-    positions = atoms.get_positions()
-    keep      = _vibrational_indices(freqs, atoms)
+    symbols     = atoms.get_chemical_symbols()
+    positions   = atoms.get_positions()
+
+    hessian_2d          = vib.get_vibrations().get_hessian_2d()
+    hessian_proj, n_rt   = _project_trans_rot(atoms, hessian_2d)
+    vib_data             = VibrationsData.from_2d(atoms, hessian_proj)
+    energies, modes      = vib_data.get_energies_and_modes()
+
+    freqs_cm = np.where(np.abs(energies.imag) > 1e-6,
+                         -energies.imag, energies.real) / invcm
+    order = np.argsort(np.abs(freqs_cm))
+    # drop the n_rt modes closest to zero (now cleanly the trans/rot ones),
+    # then order what's left with imaginary/most-negative first (molden convention)
+    keep = sorted(order[n_rt:], key=lambda i: freqs_cm[i])
 
     with open(molden_path, 'w') as f:
         f.write('[Molden Format]\n')
         f.write('[FREQ]\n')
         for i in keep:
-            f.write(f'{_mode_freq_cm(freqs[i]):6.1f}\n')
+            f.write(f'{freqs_cm[i]:6.1f}\n')
         f.write('       \n')
         f.write('[FR-COORD]\n')
         for sym, pos in zip(symbols, positions):
@@ -189,8 +211,7 @@ def write_molden_file(atoms, vib, log_path):
         f.write('[FR-NORM-COORD]\n')
         for vib_num, i in enumerate(keep, start=1):
             f.write(f'Vibration {vib_num}\n')
-            mode = vib.get_mode(i)
-            for disp in mode:
+            for disp in modes[i]:
                 f.write(f'{disp[0]*atobohr:.6f} {disp[1]*atobohr:.6f} {disp[2]*atobohr:.6f}\n')
 
 
