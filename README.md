@@ -113,7 +113,7 @@ That's it — no other keyword changes are needed. Everything else (`LowLevel`, 
 ## Installation and documentation <a name="inst"></a>
 
 Verify if your version is up to date [here](https://github.com/ComputationalChem-USC/AutoMeKin-X/blob/main/ChangeLog.md).  
-Full installation instructions and documentation are [detailed here](https://emartineznunez.github.io/AutoMeKin).
+Full installation instructions and documentation are [detailed here](https://computationalchem-usc.github.io/AutoMeKin-X).
 
 Build scripts for common platforms are included:
 
