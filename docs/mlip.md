@@ -31,6 +31,7 @@ When `HighLevel mlip <model>` is set in the input file (with `<model>` = `uma` o
 **Supported MLIP models:**
 - `uma` — Meta FAIR UMA-M model (`uma-m-1p1.pt`, optionally paired with `uma-m-1p1_atom_refs.yaml` for atomic reference energies)
 - `mace` — MACE-omol-0-extra-large-1024 model (`MACE-omol-0-extra-large-1024.model`)
+- `delta` — delta-ML correction on top of ORCA r2SCAN-3c HL energies (`HighLevel orca r2scan-3c delta`), per [Rodriguez-Lopez et al., Small Structures 2026, 7, e70504](https://onlinelibrary.wiley.com/doi/10.1002/sstr.70504). For more information on how to use it, see [AMK-ML-corrections-BH](https://github.com/ComputationalChem-USC/AMK-ML-corrections-BH).
 
 Model files are **not** bundled in this repository. They must be placed in `$AMK/models/` (the `models` subdirectory of your AutoMeKin installation prefix, `$AMK`) — this path is fixed and is not configurable from the input file. See [Using MLIP in the input file](#howto) below for the exact steps.
 
