@@ -88,6 +88,8 @@ That's it — no other keyword changes are needed. Everything else (`LowLevel`, 
    - runs TS optimizations and IRC integration with Sella, and minima optimizations + frequencies with ASE;
    - automatically detects available GPUs (`torch.cuda.device_count()`) and splits the batch across them; with 0 or 1 GPU it runs on a single device (GPU if usable, otherwise CPU — GPUs with compute capability below `sm_70` are skipped with a warning).
 
+**Installing/using UMA and MACE:** AutoMeKin only calls into these models through `mlip_calc.py`; it does not document their own installation or usage. For specifications on installing and using UMA and MACE themselves, visit their respective repositories: [UMA (fairchem)](https://github.com/facebookresearch/fairchem) and [MACE](https://github.com/ACEsuit/mace).
+
 ## Notes and limitations<a name="notes"></a>
 
 - MLIP does not provide a Gibbs free energy correction, so AutoMeKin automatically switches HL Boltzmann/microcanonical sorting to use E+ZPE instead when `HighLevel mlip` is set — set `Energy <value>` under `--Kinetics--` (not `Temperature`) as in the example above.

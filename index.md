@@ -190,4 +190,8 @@ every time it is executed. To list the instances use:
 ```bash
 singularity instance list
 ```
+
+## Using ML potentials (UMA / MACE) <a name="mlip-repos"></a>
+
+AutoMeKin only calls into these models through `mlip_calc.py`; it does not document their own installation or usage. For specifications on installing and using UMA and MACE themselves, visit their respective repositories: [UMA (fairchem)](https://github.com/facebookresearch/fairchem) and [MACE](https://github.com/ACEsuit/mace). See [Using ML potentials (MLIP)](docs/mlip.html) for how to configure AutoMeKin to use them.
 And stop them as indicated above.
