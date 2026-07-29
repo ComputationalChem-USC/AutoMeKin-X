@@ -10,7 +10,7 @@ nav_order: 1
 If you're eager to experience it firsthand, you can try this Notebook:    
 
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/emartineznunez/AutoMeKin/blob/main/notebooks/AutoMeKin.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb)
 
 # Installation of AutoMeKin
 **AutoMeKin** offers four different installation and deployment methods: 
@@ -24,7 +24,7 @@ This is the recommended option. The packages `git` and `curl` must be installed 
 First, clone the repository:
 
 ```
-git clone https://github.com/emartineznunez/AutoMeKin.git
+git clone https://github.com/ComputationalChem-USC/AutoMeKin-X.git
 ```
 
 Go to the AutoMeKin directory:
@@ -57,8 +57,8 @@ entos --license
 The most recent version is available at GitHub and can be installed as indicated in this section.
 
 You can build, system-wide and including dependencies, following the steps indicated in these scripts: 
-- [CentOS-based script](https://raw.githubusercontent.com/emartineznunez/AutoMeKin/main/Build_Centos.sh)
-- [Ubuntu-based script](https://raw.githubusercontent.com/emartineznunez/AutoMeKin/main/Build_Ubuntu.sh)
+- [CentOS-based script](https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/main/Build_Centos.sh)
+- [Ubuntu-based script](https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/main/Build_Ubuntu.sh)
 
 
 To install everything manually, follow the next steps.
@@ -83,7 +83,7 @@ needed:
 Once the above packages are installed, you can now install AutoMeKin
 following these steps:
 ```bash
-git clone https://github.com/emartineznunez/AutoMeKin.git
+git clone https://github.com/ComputationalChem-USC/AutoMeKin-X.git
 ```
 ```bash
 cd AutoMeKin

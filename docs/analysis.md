@@ -37,7 +37,7 @@ More details can be found in the [user guide](https://github.com/dgarayr/amk_too
 
 Example of an interactive dashboard for FA, with the reaction network on the left and a selected edge, _i.e._, TS, on the right. Clicking on “Show profile” enables visualization of the energy profile as well.
 <p align="center">
-   <img src="https://raw.githubusercontent.com/emartineznunez/AutoMeKin/gh-pages/assets/images/amk.jpg" alt="alt text" width="800" height="400">
+   <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/amk.jpg" alt="alt text" width="800" height="400">
 </p>
 
 ## Properties of the reaction network<a name="amktools2"></a>

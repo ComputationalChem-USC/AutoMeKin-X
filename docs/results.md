@@ -25,7 +25,7 @@ runtime and are employed to generate the final files and directories. For that r
 removed. Finally, the most important files are gathered in a final directory (`FINALDIR`) which is named after the system’s name: `FINAL_level_name`, with level being LL for low-level or HL for high level; see figure below.
 
 <p align="center">
-   <img src="https://raw.githubusercontent.com/emartineznunez/AutoMeKin/gh-pages/assets/images/folders.jpg" alt="alt text" width="800" height="200">
+   <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/folders.jpg" alt="alt text" width="800" height="200">
 </p>
 
 ## Relevant information<a name="relinfo"></a>
@@ -200,10 +200,10 @@ Each line of `rxn_all.txt` lists the nodes, first two columns, and the weight, l
 This file includes the population data for each species over time. To simplify the process of generating a plot from this file, we have used a `CSV` format that can be used with `pandas` and `matplotlib` to create a figure like this:
 
 <p align="center">
-   <img src="https://raw.githubusercontent.com/emartineznunez/AutoMeKin/gh-pages/assets/images/kinetics.png" alt="alt text" width="800" height="500">
+   <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/kinetics.png" alt="alt text" width="800" height="500">
 </p>
 
-[This Notebook](https://colab.research.google.com/github/emartineznunez/AutoMeKin/blob/main/notebooks/AutoMeKin.ipynb) shows how to build the plot using `pandas` and `matplotlib`. This is the code snippet:
+[This Notebook](https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb) shows how to build the plot using `pandas` and `matplotlib`. This is the code snippet:
 ```
 !sudo apt install cm-super dvipng texlive-latex-extra texlive-latex-recommended
 
