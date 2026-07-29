@@ -103,12 +103,11 @@ That's it — no other keyword changes are needed. Everything else (`LowLevel`, 
 **Notes / limitations:**
 - MLIP does not provide a Gibbs free energy correction, so AutoMeKin automatically switches HL Boltzmann/microcanonical sorting to use E+ZPE instead when `HighLevel mlip` is set — set `Energy <value>` under `--Kinetics--` (not `Temperature`) as in the example above.
 - `HighLevel mlip` only accepts a single model name — the two-level `method1//method2` HL string supported for `g09`/`g16` does not apply here.
-- `IRCpoints` defaults to 100 for `mlip` if not set explicitly (vs. 500 for `qcore`, 100 for `g09`/`g16`, 20 for `orca`).
+- `IRCpoints` defaults to 100 for `mlip` if not set explicitly.
 - For UMA, the optional `uma-m-1p1_atom_refs.yaml` is recommended alongside `uma-m-1p1.pt`: it supplies atomic reference energies used for isolated-atom/single-atom-fragment energies (e.g. barrierless dissociation products); without it those energies can be inaccurate.
 - Final results are collected in `FINAL_ML_<molecule>/` instead of the `FINAL_HL_<molecule>/` used by QM backends.
 - GPU selection has no dedicated AutoMeKin keyword; to restrict which GPU(s) are visible, `export CUDA_VISIBLE_DEVICES=...` in the shell/job script before launching the run.
 - `HL_rxn_network` and the other screening/kinetics keywords behave the same as with QM backends; only the HL refinement engine changes.
-- To compare MLIP results against a QM reference, see the [MEA gallery](#gallery) below, which benchmarks UMA and MACE against DFT and CCSD(T)-F12 on a full reaction network.
 
 ---
 
