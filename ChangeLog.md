@@ -1,3 +1,13 @@
+## Revision number dba348e (July 29, 2026)
+
+| Date | 	Changes |
+| ----------	 | ----------|
+|07/29/2026|	README now links to this repository's ChangeLog instead of the upstream one.|
+|07/24/2026|	Documented MLIP backend usage in README; fixed Molden vibration indexing and extended RRKM allocation.|
+|06/08/2026|	Project renamed to <code>AutoMeKin-X</code> for the 2026 release.|
+|05/26/2026|	New MLIP backend: multi-GPU batching, IRC fixes, and PRODs/FINAL/network support; added MACE and UMA calculators with single-atom fragment fixes.|
+|05/15/2026|	Added <code>ORCA</code> backend support and documentation.|
+
 ## Revision number 1142 (September 26, 2024) 
 
 | Date | 	Changes |
