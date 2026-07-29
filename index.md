@@ -4,6 +4,10 @@ layout: home
 nav_order: 1
 ---
 
+<p align="center">
+   <img src="/AutoMeKin-X/assets/images/banner.jpg" alt="AutoMeKin-X banner" class="hero-banner">
+</p>
+
 # 🚀Quick Start 
 
 
