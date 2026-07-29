@@ -390,6 +390,18 @@ function read_input {
       echo HighLevel value is $program_hl , and it should be qcore, g09, g16, orca or mlip
       exit 1
    fi
+   ###delta-ML correction (currently only for: HighLevel orca r2scan-3c delta)
+   delta_correction=0
+   delta_flag="$(awk '{if($1=="HighLevel") print tolower($4)}' $inputfile)"
+   if [ "$delta_flag" = "delta" ]; then
+      if [ "$program_hl" != "orca" ] || [ "$(echo "$HLstring0" | tr 'A-Z' 'a-z')" != "r2scan-3c" ]; then
+         echo "delta correction is only supported as: HighLevel orca r2scan-3c delta"
+         exit 1
+      fi
+      delta_correction=1
+      models_dir="${AMK}/models"
+   fi
+   export delta_correction models_dir
    #######################################################
    HLstring="$(echo "$HLstring0" | sed 's@//@ @')"
    reduce=$(awk 'BEGIN{red=-1};{if($1=="HL_rxn_network") {if($2=="complete") red=0;if($2=="reduced" && NF==3) red=$3}};END{print red}' $inputfile)

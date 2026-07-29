@@ -22,5 +22,5 @@ dist_bin_SCRIPTS=get_energy_g09_CCSDT.sh \
             LOCATE_BARRIERLESS.sh \
             get_energy_mlip.sh get_ZPE_mlip.sh get_geom_mlip.sh \
             get_freq_mlip.sh get_G_mlip.sh get_sigma_mlip.sh \
-            get_minfminr_mlip.sh
+            get_minfminr_mlip.sh apply_delta_correction.py
 

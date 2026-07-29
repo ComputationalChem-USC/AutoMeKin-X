@@ -236,10 +236,16 @@ cp ${tsdirhl}/MINs/SORTED/minshl.db $final
 sqlite3 $final/minshl.db "alter table minshl rename to min"
 mv $final/minshl.db $final/min.db
 
-##copy the TSs 
+##copy the TSs
 cp ${tsdirhl}/TSs/SORTED/tsshl.db $final
 sqlite3 $final/tsshl.db "alter table tsshl rename to ts"
 mv $final/tsshl.db $final/ts.db
+
+##Apply delta-ML correction (HighLevel orca r2scan-3c delta)
+if [ "$delta_correction" = "1" ]; then
+   echo "Applying delta-ML correction (r2SCAN-3c -> CCSD(T)-F12a level) to $final"
+   apply_delta_correction.py $final $models_dir
+fi
 
 ##Making final MINinfo file
 awk 'BEGIN{if('$rate'==0) fl="DG"; if('$rate'==1) fl="DE"}
