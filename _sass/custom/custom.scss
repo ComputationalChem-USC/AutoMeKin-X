@@ -1,6 +1,10 @@
 // Modern font stack (hard-coded values, no cross-file variable dependency)
 body {
   font-family: "Inter", system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", roboto, "Helvetica Neue", arial, sans-serif;
+  background-image: url("/AutoMeKin-X/assets/images/background.png");
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-size: contain;
 }
 
 .main-content h1,
@@ -22,28 +26,24 @@ body {
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
 }
 
-// Hero section: background.png backdrop behind the animated logo
+// Hero section: houses the animated logo, sized to its native 1408x792 (16:9) stage
 .hero-section {
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0.5rem auto 2rem;
-  padding: 1.5rem;
-  border-radius: 16px;
-  background-image: url("/AutoMeKin-X/assets/images/background.png");
-  background-size: cover;
-  background-position: center;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
 }
 
 .hero-logo-frame {
   display: block;
   width: 100%;
-  max-width: 700px;
-  height: 260px;
+  max-width: 900px;
+  aspect-ratio: 1408 / 792;
+  height: auto;
   border: none;
-  border-radius: 10px;
+  border-radius: 14px;
   background: transparent;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
 }
 
 // Bigger type and more breathing room for the main content column
