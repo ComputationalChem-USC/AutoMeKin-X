@@ -1,14 +1,15 @@
 // Modern font stack (hard-coded values, no cross-file variable dependency)
 body {
   font-family: "Inter", system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", roboto, "Helvetica Neue", arial, sans-serif;
+  background-color: #f1f5f9;
 }
 
-// Background behind the left sidebar (nav headings/links)
+// Small background image at the bottom of the left sidebar (nav headings/links)
 .side-bar {
   background-image: url("/AutoMeKin-X/assets/images/background.png");
   background-repeat: no-repeat;
-  background-position: center;
-  background-size: cover;
+  background-position: bottom center;
+  background-size: 160px auto;
 }
 
 .main-content h1,
