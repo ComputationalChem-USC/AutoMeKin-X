@@ -4,9 +4,9 @@ layout: home
 nav_order: 1
 ---
 
-<p align="center">
-   <img src="/AutoMeKin-X/assets/images/banner.jpg" alt="AutoMeKin-X banner" class="hero-banner">
-</p>
+<div class="hero-section">
+  <iframe src="/AutoMeKin-X/assets/animated-logo.html" class="hero-logo-frame" title="AutoMeKin-X animated logo" loading="lazy"></iframe>
+</div>
 
 <div class="feature-grid">
   <a class="feature-card" href="#mm">

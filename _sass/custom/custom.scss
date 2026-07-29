@@ -22,6 +22,30 @@ body {
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
 }
 
+// Hero section: background.png backdrop behind the animated logo
+.hero-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.5rem auto 2rem;
+  padding: 1.5rem;
+  border-radius: 16px;
+  background-image: url("/AutoMeKin-X/assets/images/background.png");
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+}
+
+.hero-logo-frame {
+  display: block;
+  width: 100%;
+  max-width: 700px;
+  height: 260px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+}
+
 // Bigger type and more breathing room for the main content column
 .main-content {
   font-size: 19px;
