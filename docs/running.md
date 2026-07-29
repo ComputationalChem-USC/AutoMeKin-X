@@ -50,6 +50,6 @@ sbatch --output=hlcalcs.log --error=hlcalcs.err -n $ntasks -c $ncores --mem-per-
 
 
 {: .note }   
-Details about the workflows involved in `llcals.sh` and `hlcalcs.sh` can be looked up in [this section](https://emartineznunez.github.io/AutoMeKin/docs/scripts.html).  
+Details about the workflows involved in `llcals.sh` and `hlcalcs.sh` can be looked up in [this section](https://computationalchem-usc.github.io/AutoMeKin-X/docs/scripts.html).  
 
-If something goes wrong, you might want to have a look [at this section](https://emartineznunez.github.io/AutoMeKin/docs/scripts.html#abort) describing how to stop the calculations.
+If something goes wrong, you might want to have a look [at this section](https://computationalchem-usc.github.io/AutoMeKin-X/docs/scripts.html#abort) describing how to stop the calculations.

@@ -80,4 +80,4 @@ additional lines right below the keyword line (see _Biased dynamics_).
 
 Next, you will find a detailed explanation of the keywords grouped together in the different sections. For
 each section, only the most important keywords are described. Additional keywords can be found in
-[Other capabilities](https://emartineznunez.github.io/AutoMeKin/docs/other.html).
+[Other capabilities](https://computationalchem-usc.github.io/AutoMeKin-X/docs/other.html).
