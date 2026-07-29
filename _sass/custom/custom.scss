@@ -1,10 +1,14 @@
 // Modern font stack (hard-coded values, no cross-file variable dependency)
 body {
   font-family: "Inter", system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", roboto, "Helvetica Neue", arial, sans-serif;
+}
+
+// Background behind the left sidebar (nav headings/links)
+.side-bar {
   background-image: url("/AutoMeKin-X/assets/images/background.png");
   background-repeat: no-repeat;
-  background-position: top center;
-  background-size: contain;
+  background-position: center;
+  background-size: cover;
 }
 
 .main-content h1,
@@ -24,33 +28,6 @@ body {
   margin: 0.5rem auto 2rem;
   border-radius: 14px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
-}
-
-// Hero section: houses the animated logo
-.hero-section {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0.5rem auto 2rem;
-}
-
-// The embedded page has a fixed 1408x792 stage (not responsive), so the
-// iframe is rendered at native size and scaled down with JS (see index.md)
-// to fit this wrapper; the wrapper's own size is what controls the visible box.
-.hero-logo-scale-wrap {
-  position: relative;
-  width: 100%;
-  max-width: 900px;
-  overflow: hidden;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
-}
-
-#hero-logo-frame {
-  display: block;
-  border: none;
-  background: transparent;
-  transform-origin: top left;
 }
 
 // Bigger type and more breathing room for the main content column

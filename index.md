@@ -4,26 +4,9 @@ layout: home
 nav_order: 1
 ---
 
-<div class="hero-section">
-  <div class="hero-logo-scale-wrap" id="hero-logo-wrap">
-    <iframe id="hero-logo-frame" src="/AutoMeKin-X/assets/animated-logo.html" width="1408" height="792" title="AutoMeKin-X animated logo" loading="lazy"></iframe>
-  </div>
-</div>
-
-<script>
-(function () {
-  var wrap = document.getElementById('hero-logo-wrap');
-  var frame = document.getElementById('hero-logo-frame');
-  var NATIVE_W = 1408, NATIVE_H = 792;
-  function resize() {
-    var scale = wrap.clientWidth / NATIVE_W;
-    frame.style.transform = 'scale(' + scale + ')';
-    wrap.style.height = (NATIVE_H * scale) + 'px';
-  }
-  window.addEventListener('resize', resize);
-  resize();
-})();
-</script>
+<p align="center">
+   <img src="/AutoMeKin-X/assets/images/banner.jpg" alt="AutoMeKin-X banner" class="hero-banner">
+</p>
 
 <div class="feature-grid">
   <a class="feature-card" href="#mm">
