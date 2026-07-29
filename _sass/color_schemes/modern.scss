@@ -1,0 +1,26 @@
+$color-scheme: modern !default;
+
+// Palette
+$accent: #4f46e5; // indigo-600
+$accent-dark: #4338ca; // indigo-700
+$ink: #0f172a; // slate-900
+$ink-soft: #334155; // slate-700
+$paper: #ffffff;
+$paper-soft: #f8fafc; // slate-50
+$paper-code: #f1f5f9; // slate-100
+
+$body-background-color: $paper !default;
+$body-heading-color: $ink !default;
+$body-text-color: $ink-soft !default;
+$link-color: $accent !default;
+$nav-child-link-color: $ink-soft !default;
+$sidebar-color: $paper-soft !default;
+$base-button-color: $paper-soft !default;
+$btn-primary-color: $accent !default;
+$code-background-color: $paper-code !default;
+$feedback-color: darken($sidebar-color, 3%) !default;
+$table-background-color: $paper !default;
+$search-background-color: $paper !default;
+$search-result-preview-color: $ink-soft !default;
+
+@import "./vendor/OneLightJekyll/syntax";

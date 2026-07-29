@@ -8,6 +8,29 @@ nav_order: 1
    <img src="/AutoMeKin-X/assets/images/banner.jpg" alt="AutoMeKin-X banner" class="hero-banner">
 </p>
 
+<div class="feature-grid">
+  <a class="feature-card" href="#mm">
+    <div class="feature-card-icon">⚙️</div>
+    <h3>Install AutoMeKin</h3>
+    <p>micromamba, build from source, or a Singularity container.</p>
+  </a>
+  <a class="feature-card" href="docs/mlip.html">
+    <div class="feature-card-icon">🤖</div>
+    <h3>ML Potentials</h3>
+    <p>Use UMA or MACE for high-level refinement — no QM code required.</p>
+  </a>
+  <a class="feature-card" href="docs/tutorial.html">
+    <div class="feature-card-icon">📘</div>
+    <h3>Tutorial</h3>
+    <p>Step-by-step guide to input files, workflows, and analysis.</p>
+  </a>
+  <a class="feature-card" href="https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb">
+    <div class="feature-card-icon">🚀</div>
+    <h3>Try it in Colab</h3>
+    <p>No installation needed — run a live example in your browser.</p>
+  </a>
+</div>
+
 # 🚀Quick Start 
 
 
