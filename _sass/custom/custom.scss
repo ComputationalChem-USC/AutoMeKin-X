@@ -12,6 +12,26 @@ body {
   background-size: contain;
 }
 
+// Dynamic animated gradient header bar (no logo image, just the site title)
+@keyframes headerGradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.site-header {
+  background: linear-gradient(120deg, #4338ca, #4f46e5, #6366f1, #4f46e5, #4338ca);
+  background-size: 300% 300%;
+  animation: headerGradientShift 10s ease infinite;
+  border-bottom: none;
+  color: #fff;
+}
+
+.site-title,
+.site-title:hover {
+  color: #fff !important;
+}
+
 .main-content h1,
 .main-content h2,
 .main-content h3,
