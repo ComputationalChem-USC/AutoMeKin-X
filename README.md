@@ -153,6 +153,7 @@ Submit simple examples directly at [https://rxnkin.usc.es/amk/](https://rxnkin.u
 
 If you use AutoMeKin in your work, please cite the original papers and the Zenodo release:
 
+> E. Martínez-Núñez et al., *J. Comput. Chem.* **2021**, 42, 2036–2048. [AutoMeKin2021: An open-source program for automated reaction discovery](https://doi.org/10.1002/jcc.26734)  
 > E. Martínez-Núñez et al., *J. Comput. Chem.* **2015**, 36, 222–234.  
 > E. Martínez-Núñez, *Phys. Chem. Chem. Phys.* **2015**, 17, 14912–14921.  
 > [![DOI](https://zenodo.org/badge/476189550.svg)](https://zenodo.org/badge/latestdoi/476189550)
