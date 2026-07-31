@@ -27,8 +27,16 @@ dependencies:
   - nodejs
   - curl
   - pillow
+  - joblib
   - tbb[version='<2021']
   - pip
   - pip:
       - git+https://github.com/dgarayr/amk_tools.git
+      # MLIP backend (HighLevel mlip uma/mace) -- installed via pip to avoid
+      # disturbing the conda solve (qcore/entos pins tbb<2021 above)
+      - torch
+      - sella
+      - omegaconf
+      - mace-torch
+      - fairchem-core
 
