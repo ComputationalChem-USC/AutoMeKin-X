@@ -102,7 +102,11 @@ Additionally,
 {: .highlight }    
 The following **Python3 libraries** are
 needed:  
-[ASE== 3.21.1](https://wiki.fysik.dtu.dk/ase/install.html), [Matplotlib>= 3.3.4](https://matplotlib.org/stable/users/installing/index.html), [NetworkX>= 2.5](https://networkx.org/documentation/stable/install.html), [NumPy== 1.19.5](https://numpy.org/install/), [SciPy>= 1.5.4](https://scipy.org/install/), [amk_tools](https://github.com/dgarayr/amk_tools)
+[ASE](https://wiki.fysik.dtu.dk/ase/install.html), [Matplotlib](https://matplotlib.org/stable/users/installing/index.html), [NetworkX](https://networkx.org/documentation/stable/install.html), [NumPy](https://numpy.org/install/), [SciPy](https://scipy.org/install/), [joblib](https://joblib.readthedocs.io/), [amk_tools](https://github.com/dgarayr/amk_tools)
+
+{: .highlight }
+If you plan to use the **MLIP** backend (`HighLevel mlip uma` or `mace`; see [Using ML potentials](docs/mlip.html)), you additionally need:  
+[PyTorch](https://pytorch.org/get-started/locally/) (2.7 or newer recommended), [Sella](https://github.com/zadorlab/sella), [MACE](https://github.com/ACEsuit/mace) (`mace-torch` on PyPI), [fairchem-core](https://github.com/facebookresearch/fairchem) (for UMA), [OmegaConf](https://omegaconf.readthedocs.io/)
 
 
 ### Installing AutoMeKin
