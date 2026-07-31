@@ -8,7 +8,7 @@
    <img src="banner.jpg" alt="AutoMeKin-X banner" width="700">
 </p>
 
-**AutoMeKin** (formerly `tsscds`) discovers reaction mechanisms automatically. Transition states are located using MD simulations and Graph Theory algorithms; Monte Carlo simulations provide kinetic results. The only required input is a starting molecular structure in XYZ format. The method is described in [Rodriguez et al. (2015)](https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.23790) and [Martinez-Nunez (2015)](https://pubs.rsc.org/en/content/articlelanding/2015/cp/c5cp02175h).
+**AutoMeKin** (formerly `tsscds`) discovers reaction mechanisms automatically. Transition states are located using MD simulations and Graph Theory algorithms; Monte Carlo simulations provide kinetic results. The only required input is a starting molecular structure in XYZ format. The method is described in [Martínez-Núñez (2015)](https://onlinelibrary.wiley.com/doi/abs/10.1002/jcc.23790) and [Martínez-Núñez (2015)](https://pubs.rsc.org/en/content/articlelanding/2015/cp/c5cp02175h).
 
 ---
 
