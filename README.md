@@ -150,9 +150,8 @@ Submit simple examples directly at [https://rxnkin.usc.es/amk/](https://rxnkin.u
 ---
 
 ## Citation
-
 If you use AutoMeKin in your work, please cite the original papers:
-
+> O. Rodríguez-López et al., *ChemRxiv* **2026**. [Enhancing the Efficiency and Flexibility of AutoMeKin: Integrating ORCA and Machine-Learning Potentials](https://doi.org/10.26434/chemrxiv.15006924/v1)  
 > E. Martínez-Núñez et al., *J. Comput. Chem.* **2021**, 42, 2036–2048. [AutoMeKin2021: An open-source program for automated reaction discovery](https://doi.org/10.1002/jcc.26734)  
 > E. Martínez-Núñez et al., *J. Comput. Chem.* **2015**, 36, 222–234. [An automated method to find transition states using chemical dynamics simulations](https://doi.org/10.1002/jcc.23790)  
 > E. Martínez-Núñez, *Phys. Chem. Chem. Phys.* **2015**, 17, 14912–14921. [An automated transition state search using classical trajectories initialized at multiple minima](https://doi.org/10.1039/c5cp02175h)
