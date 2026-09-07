@@ -601,19 +601,54 @@ def process_one(name, xyz_content, calc, calctype, model_name, charge=0, mult=1)
         print(f"  {name}: ERROR - {e}", flush=True)
 
 
-def _cpu_worker_count():
+# Empirical RAM footprint (GB) of one CPU worker after loading the model and
+# running a real calculation (load + 1 energy/force call), with headroom.
+_CPU_WORKER_RAM_GB = {'uma': 7.0, 'mace': 1.5}
+_CPU_WORKER_RAM_GB_DEFAULT = 8.0  # conservative fallback for unlisted models
+
+
+def _cpu_worker_count(model_name):
     """Number of CPU worker processes to use for MLIP batch calculations
     when no GPU is available. Reuses the `runningtasks` value AutoMeKin's
     shell scripts already export for this run (the same knob that controls
     how many parallel ORCA/Gaussian/qcore jobs `doparallel` launches), so
     no new keyword or CLI argument is needed. Falls back to 1 (current
-    sequential behavior) if unset, and never exceeds the CPU count."""
+    sequential behavior) if unset, and never exceeds the CPU count.
+
+    Also caps the result so total RAM usage stays within what's actually
+    available: each CPU worker loads its own full copy of the model (e.g.
+    ~6 GB for UMA), so naively honoring a large `runningtasks` can OOM the
+    machine -- this only happened to go unnoticed during development
+    because that machine had hundreds of GB of RAM."""
     try:
         n = int(os.environ.get('runningtasks', '1'))
     except ValueError:
         n = 1
     ncpus = os.cpu_count() or 1
-    return max(1, min(n, ncpus))
+    n = max(1, min(n, ncpus))
+
+    ram_per_worker_gb = _CPU_WORKER_RAM_GB.get(model_name, _CPU_WORKER_RAM_GB_DEFAULT)
+    try:
+        with open('/proc/meminfo') as f:
+            mem_available_gb = next(
+                (int(line.split()[1]) / 1024 / 1024
+                 for line in f if line.startswith('MemAvailable:')),
+                None
+            )
+    except OSError:
+        mem_available_gb = None
+
+    if mem_available_gb is not None:
+        usable_gb = max(0.0, mem_available_gb - 2.0)  # headroom for OS + main process
+        mem_cap = max(1, int(usable_gb // ram_per_worker_gb))
+        if mem_cap < n:
+            print(f"Limiting CPU workers to {mem_cap} (requested {n}) to fit "
+                  f"available RAM (~{mem_available_gb:.1f} GB available, "
+                  f"~{ram_per_worker_gb:.1f} GB/worker estimated for '{model_name}')",
+                  flush=True)
+        n = min(n, mem_cap)
+
+    return max(1, n)
 
 
 def _batch_worker(args):
@@ -687,7 +722,7 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
             pool.map(_batch_worker, args_list)
     else:
         # No GPU: parallelize across CPU worker processes if `runningtasks` > 1
-        nworkers = _cpu_worker_count()
+        nworkers = _cpu_worker_count(model_name)
         if nworkers > 1:
             print(f"No GPU available -- using {nworkers} CPU worker processes "
                   f"in parallel (from runningtasks)", flush=True)
