@@ -601,10 +601,12 @@ def process_one(name, xyz_content, calc, calctype, model_name, charge=0, mult=1)
         print(f"  {name}: ERROR - {e}", flush=True)
 
 
-# Empirical RAM footprint (GB) of one CPU worker after loading the model and
-# running a real calculation (load + 1 energy/force call), with headroom.
-_CPU_WORKER_RAM_GB = {'uma': 7.0, 'mace': 1.5}
-_CPU_WORKER_RAM_GB_DEFAULT = 8.0  # conservative fallback for unlisted models
+# Empirical PEAK RAM footprint (GB) of one CPU worker, measured via
+# VmHWM/ru_maxrss (the high-water mark, not steady-state VmRSS -- the peak
+# happens transiently while the checkpoint is loaded/converted, and that peak
+# is what the OS must be able to satisfy, even though usage drops afterward).
+_CPU_WORKER_RAM_GB = {'uma': 24.0, 'mace': 2.0}
+_CPU_WORKER_RAM_GB_DEFAULT = 24.0  # conservative fallback for unlisted models
 
 
 def _cpu_worker_count(model_name):
