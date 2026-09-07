@@ -1,7 +1,7 @@
 #!/bin/bash
 source utils.sh
 #On exit remove tmp files
-tmp_files=(ConnMat tmp_gauss tmp* ScalMat *.arc *.mop fort.* partial_opt ts_opt *_dyn* *_backup rotate.dat minn black_list* bfgs.log none.out forces.xyz velocities.xyz restraints.xyz energies.txt freq.molden min.xyz ts_opt.xyz ts.xyz min_opt.xyz v0 grad.dat grad.*)
+tmp_files=(ConnMat tmp_gauss tmp* ScalMat *.arc *.mop fort.* partial_opt ts_opt *_dyn* *_backup rotate.dat minn black_list* bfgs.log none.out forces.xyz velocities.xyz restraints.xyz energies.txt freq.molden min.xyz ts_opt.xyz ts.xyz min_opt.xyz v0 grad.dat grad.* min_popt.xyz min_popt.log opt_start_traj.xyz optstart_ref.* optstart_ref_* *_sella.log *.traj *_vib *_vib.* bbfs.out)
 trap 'err_report2 $LINENO $gauss_line' ERR
 trap cleanup EXIT INT
 
@@ -42,6 +42,12 @@ if [ -f $kmcfilell ] && [ -f $minfilell ] && [ $mdc -ge 1 ] && [ $ndis -eq 1 ]; 
 generate_dynamics_template
 ##make temporary folders
 make_temp_folders
+##Start a persistent mlip_calc.py worker for this batch (uma only -- see
+##mlip_server_start in utils.sh) so opt_start and the trajectory loop below
+##don't reload the model on every call.
+if [ "$ll_mlip_model" = "uma" ] && { [ "$program_md" = "mlip" ] || [ "$program_opt" = "mlip" ]; }; then
+   mlip_server_start
+fi
 ###Opt the starting structure and get e0 and emaxts
 opt_start
 ####
@@ -108,9 +114,21 @@ do
            entos.py ${named}.qcore > ${named}.out 2>&1
            if [ ! -f traj.xyz ]; then
               echo "traj.xyz does not exist"
-              continue 
+              continue
            else
               mv traj.xyz coordir/${named}.xyz
+           fi
+        elif [ "$program_md" = "mlip" ]; then
+           if [ -n "$mlip_server_pid" ]; then
+              mlip_request "md opt_start.xyz $excite $nfs"
+           else
+              mlip_calc.py md opt_start.xyz $ll_mlip_model $models_dir $charge $mult $excite $nfs &> ${named}.log
+           fi
+           if [ ! -f opt_start_traj.xyz ]; then
+              echo "${named}.xyz does not exist"
+              continue
+           else
+              mv opt_start_traj.xyz coordir/${named}.xyz
            fi
         fi
      else
@@ -211,13 +229,34 @@ do
           fi 
           sed 's/labels/'"$labels"'/g;s/carga/'$charge'/' ${sharedir}/opt_frozen > partial_opt/pes_qcore
           entos.py partial_opt/pes_qcore > partial_opt/pes_qcore.out
-          if [ ! -f min_opt.xyz ]; then 
+          if [ ! -f min_opt.xyz ]; then
+             printf "     Pt%2s: failed-->Partial Opt failed\n" $npo
+             continue
+          fi
+       elif [ "$program_md" = "mlip" ]; then
+          rm -f min_popt.xyz
+          echo $natom > min.xyz
+          echo "" >> min.xyz
+          if [ $postp_alg -eq 1 ]; then
+             awk '{print $1,$2,$4,$6}' partial_opt/fort.$ctspt >> min.xyz
+             labels=$(awk '{if($3=="0") {printf "%s%s",sep,NR; sep=","}};END{print ""}' partial_opt/fort.$ctspt)
+          else
+             awk '{print $1,$2,$4,$6}' partial_opt/fort.$ip >> min.xyz
+             labels=$(awk '{if($3=="0") {printf "%s%s",sep,NR; sep=","}};END{print ""}' partial_opt/fort.$ip)
+          fi
+          if [ -n "$mlip_server_pid" ]; then
+             mlip_request "partial_opt min.xyz ${labels:-NONE}"
+          else
+             mlip_calc.py partial_opt min.xyz "$labels" $ll_mlip_model $models_dir $charge $mult
+          fi
+          if [ ! -f min_popt.xyz ]; then
              printf "     Pt%2s: failed-->Partial Opt failed\n" $npo
              continue
           fi
        fi
        name=ts${i}_${ip}_${ctspt}
        fileden=ts_opt/${name}.den
+       filemolden=ts_opt/${name}.molden
        if [ "$program_opt" = "mopac" ]; then
           geom_TS="$(echo "$geo_pes" | awk 'NF==4{print $0}')"
           name_TS_inp=ts_opt/${name}
@@ -234,6 +273,26 @@ do
           else
              cat ts_opt.xyz >> ts_opt/${name}.out
           fi
+          file=ts_opt/${name}.out
+       elif [ "$program_opt" = "mlip" ]; then
+          if [ -f min_popt.xyz ]; then
+             cp min_popt.xyz ${name}.xyz
+          else
+             printf "%s\n\n%s\n" "$natom" "$geo_pes" > ${name}.xyz
+          fi
+          if [ -n "$mlip_server_pid" ]; then
+             mlip_request "tsopt ${name}.xyz"
+          else
+             mlip_calc.py tsopt ${name}.xyz $ll_mlip_model $models_dir $charge $mult
+          fi
+          if [ ! -f ${name}.log ] || ! grep -q AMK_TERMINATED_NORMALLY ${name}.log; then
+             printf "     Pt%2s: failed-->EF algorithm was unable to optimize a TS\n" $npo
+             rm -f ${name}.xyz ${name}.log
+             continue
+          fi
+          mv ${name}.log ts_opt/${name}.out
+          if [ -f ${name}.molden ]; then mv ${name}.molden ts_opt/${name}.molden ; fi
+          rm -f ${name}.xyz
           file=ts_opt/${name}.out
        else
 #construct g09 input file
@@ -293,6 +352,7 @@ do
                 printf "     Pt%2s: TS optimized and added to ts list\n" $npo
                 if [ "$program_opt" = "qcore" ]; then mv freq.molden $tsdirll/${name}.molden ; fi
                 if [ "$program_opt" = "mopac" ]; then get_NM_mopac.sh $tsdirll/${name}.out $tsdirll/${name} ; fi
+                if [ -f ${filemolden} ]; then cp ${filemolden} ${tsdirll}/${name}.molden ; fi
              else
                 printf "     Pt%2s: TS optimized but not added-->redundant with ts %4s\n" $npo $ok
              fi
@@ -305,6 +365,7 @@ do
              printf "     Pt%2s: TS optimized and added to ts list\n" $npo
              if [ "$program_opt" = "qcore" ]; then mv freq.molden $tsdirll/${name}.molden ; fi
              if [ "$program_opt" = "mopac" ]; then get_NM_mopac.sh $tsdirll/${name}.out $tsdirll/${name} ; fi
+             if [ -f ${filemolden} ]; then cp ${filemolden} ${tsdirll}/${name}.molden ; fi
           fi
           ) 200>>${tslistll}.lock
           if [ $mdc -ge 1 ]; then exit ; fi

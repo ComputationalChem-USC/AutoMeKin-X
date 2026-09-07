@@ -43,6 +43,15 @@ do
   if [ $(sqlite3 ${tsdirll}/TSs/ts.db "select exists(select name from ts where name='$name')") -eq 1 ]; then continue ; fi
 
 #First the tss
+  if [ "$program_irc" = "mlip" ]; then
+     tslog=$tsdirll/TSs/${name}.log
+     freq="$(get_freq_mlip.sh $tslog)"
+     geom="$(get_geom_mlip.sh $tslog)"
+     e=$(get_energy_mlip.sh $tslog | awk '{printf "%10.2f",$1*627.51}')
+     zpe=$(get_ZPE_mlip.sh $tslog)
+     sigma=$(get_sigma_mlip.sh $tslog)
+     g_corr=$(get_G_mlip.sh $tslog)
+  else
   if [ "$program_opt" = "g09" ] || [ "$program_opt" = "g16" ]; then
      freq="$(get_freq_mopac.sh $tsdirll/${name}_mop.out)"
   elif [ "$program_opt" = "mopac" ]; then
@@ -70,6 +79,7 @@ do
      sigma=1
      g_corr=$(awk '/Gibbs/{gibbs=$NF};END{print gibbs*627.51}' $tsdirll/TSs/${name}_thermo.out )
   fi
+  fi
 ##insert into ts.db
   sqlite3 ${tsdirll}/TSs/ts.db "insert into ts (natom,name,energy,zpe,g,geom,freq,sigma) values ($natom,'$name',$e,$zpe,$g_corr,'$geom','$freq',$sigma);"
 ##insert into ts.db
@@ -77,6 +87,25 @@ do
 #Now the minima
   namef=minf_${name}
 
+  if [ "$program_irc" = "mlip" ]; then
+     mlogf=$tsdirll/IRC/${namef}.log
+     if [ -f "$mlogf" ] && grep -q AMK_TERMINATED_NORMALLY "$mlogf"; then
+        geomf="$(get_geom_mlip.sh $mlogf)"
+        freqf="$(get_freq_mlip.sh $mlogf)"
+        ef=$(get_energy_mlip.sh $mlogf | awk '{printf "%10.2f",$1*627.51}')
+        zpef=$(get_ZPE_mlip.sh $mlogf)
+        sigmaf=$(get_sigma_mlip.sh $mlogf)
+        g_corrf=$(get_G_mlip.sh $mlogf)
+     else
+        echo "Problems with this minimum: $namef-->MLIP opt failed"
+        zpef=0
+        g_corrf=0
+        freqf=""
+        sigmaf=1
+        ef=$(get_energy_mlip.sh $tsdirll/IRC/ircf_${name}.log | awk '{printf "%10.2f",$1*627.51}')
+        geomf="$(awk 'NR>2{print $0}' $tsdirll/IRC/ircf_${name}_last.xyz)"
+     fi
+  else
   if [ "$program_opt" != "qcore" ]; then
      geomf="$(get_geom_mopac.sh $tsdirll/IRC/${namef}.out | awk 'NR>2{print $0}')"
      freqf="$(get_freq_mopac.sh $tsdirll/IRC/${namef}.out)"
@@ -98,7 +127,7 @@ do
      sigmaf=1
      g_corrf=$(awk '/Gibbs/{gibbs=$NF};END{print gibbs*627.51}' $tsdirll/IRC/${namef}.out )
   fi
-#The minima might have failed in the opt process. In that case empty the freq column 
+#The minima might have failed in the opt process. In that case empty the freq column
   if [ -z "$freqf" ]; then
      echo "Problems with this minimum: $namef-->thermo calc failed"
      zpef=0
@@ -106,7 +135,7 @@ do
      freqf=""
      sigmaf=1
      if [ "$program_opt" != "qcore" ]; then
-        ircn0=$(echo $namef | sed 's@min@@;s@_@ @') 
+        ircn0=$(echo $namef | sed 's@min@@;s@_@ @')
         ircnf=$(echo $ircn0 | awk '{print $2"_irc"$1".xyz"}')
         ef=$(awk '/HEAT OF FORMATION/{heat=$(NF-1)};END{print heat}' $tsdirll/IRC/$ircnf)
         geomf="$(awk '/HEAT OF FORMATION/{natom=0};{if(NF==4) {++natom;line[natom]=$0} };END{i=1;while(i<=natom){print line[i];i++}}' $tsdirll/IRC/$ircnf)"
@@ -114,8 +143,9 @@ do
         ets=$(awk '/Energy=/{e0=$2};END{printf "%10.2f\n",e0*627.51}' $tsdirll/${name}.out )
         deltaf=$(awk 'BEGIN{act=0};/DVV/{if($NF=="-1") act=1};{if(act==1 && NF==6) delta=$2};{if(act==1 && NF==0) {print delta;exit}};{if(act==1 && $2=="QCORE") {print delta;exit}}' $tsdirll/IRC/${name}_ircf.out)
         ef=$(echo "$ets + $deltaf" | bc -l)
-        geomf="$(awk 'NR>2' $tsdirll/IRC/${name}_forward_last.xyz)" 
+        geomf="$(awk 'NR>2' $tsdirll/IRC/${name}_forward_last.xyz)"
      fi
+  fi
   fi
 ##min or prod##
   echo $natom > mingeom
@@ -142,6 +172,25 @@ do
 
   namer=minr_${name}
 
+  if [ "$program_irc" = "mlip" ]; then
+     mlogr=$tsdirll/IRC/${namer}.log
+     if [ -f "$mlogr" ] && grep -q AMK_TERMINATED_NORMALLY "$mlogr"; then
+        geomr="$(get_geom_mlip.sh $mlogr)"
+        freqr="$(get_freq_mlip.sh $mlogr)"
+        er=$(get_energy_mlip.sh $mlogr | awk '{printf "%10.2f",$1*627.51}')
+        zper=$(get_ZPE_mlip.sh $mlogr)
+        sigmar=$(get_sigma_mlip.sh $mlogr)
+        g_corrr=$(get_G_mlip.sh $mlogr)
+     else
+        echo "Problems with this minimum: $namer-->MLIP opt failed"
+        zper=0
+        g_corrr=0
+        freqr=""
+        sigmar=1
+        er=$(get_energy_mlip.sh $tsdirll/IRC/ircr_${name}.log | awk '{printf "%10.2f",$1*627.51}')
+        geomr="$(awk 'NR>2{print $0}' $tsdirll/IRC/ircr_${name}_last.xyz)"
+     fi
+  else
   if [ "$program_opt" != "qcore" ]; then
      geomr="$(get_geom_mopac.sh $tsdirll/IRC/${namer}.out | awk 'NR>2{print $0}')"
      freqr="$(get_freq_mopac.sh $tsdirll/IRC/${namer}.out)"
@@ -163,7 +212,7 @@ do
      sigmar=1
      g_corrr=$(awk '/Gibbs/{gibbs=$NF};END{print gibbs*627.51}' $tsdirll/IRC/${namer}.out )
   fi
-#The minima might have failed in the opt process. In that case empty the freq column 
+#The minima might have failed in the opt process. In that case empty the freq column
   if [ -z "$freqr" ]; then
      echo "Problems with this minimum: $namer-->thermo calc failed"
      er=0
@@ -180,8 +229,9 @@ do
         ets=$(awk '/Energy=/{e0=$2};END{printf "%10.2f\n",e0*627.51}' $tsdirll/${name}.out )
         deltar=$(awk 'BEGIN{act=0};/DVV/{if($NF=="1") act=1};{if(act==1 && NF==6) delta=$2};{if(act==1 && NF==0) {print delta;exit}};{if(act==1 && $2=="QCORE") {print delta;exit}}' $tsdirll/IRC/${name}_ircr.out)
         er=$(echo "$ets + $deltar" | bc -l)
-        geomr="$(awk 'NR>2' $tsdirll/IRC/${name}_reverse_last.xyz)" 
+        geomr="$(awk 'NR>2' $tsdirll/IRC/${name}_reverse_last.xyz)"
      fi
+  fi
   fi
 ##min or prod##
   echo $natom > mingeom

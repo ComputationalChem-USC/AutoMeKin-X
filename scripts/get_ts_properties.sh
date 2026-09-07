@@ -37,6 +37,24 @@ elif [ $2 -eq 2 ]; then
    if(f==0) f=zero
    if(e==0) {e=zero;f=-4}
    print f,e,freq[2],freq[3],freq[4],freq[5]}' tmp_gauss
+##MLIP
+elif [ $2 -eq 3 ]; then
+   e=$(get_energy_mlip.sh $file)
+   get_freq_mlip.sh $file | awk -v e="$e" 'BEGIN{zero=0}
+   {++n;fr[n]=$1}
+   END{
+   if(n==0){print -4,zero,0,0,0,0;exit}
+   imagf=fr[1]
+   f=sqrt(imagf*imagf)
+   if ('$tight' == 1) {
+      if(fr[2]<0)
+         f=-1
+      else if(fr[2]+fr[3]<10)
+         f=-2 }
+   if(imagf>0) f=-3
+   if(f==0) f=zero
+   if(e==0 || e=="") {e=zero;f=-4}
+   print f,e+0,fr[2]+0,fr[3]+0,fr[4]+0,fr[5]+0}'
 ##QCORE
 elif [ $2 -eq 0 ] || [ $2 -eq -1 ]; then
    awk 'BEGIN{zero=0}

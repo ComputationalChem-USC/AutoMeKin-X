@@ -5,7 +5,6 @@ import networkx as nx
 #from ase.autoneb import AutoNEB
 from ase.mep import AutoNEB
 from ase.constraints import ExternalForce,FixAtoms,FixBondLengths
-from ase.dimer import DimerControl, MinModeAtoms, MinModeTranslate
 from ase.io import read, write
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.optimize import BFGS,FIRE
@@ -159,8 +158,17 @@ def vib_calc(ts):
     return eigenv,freq
 
 def attach_calculators(images):
-    for image in images:  
+    for image in images:
         if prog == 'mopac': image.calc = MOPACamk(method=method+' threads=1 charge='+charge,relscf=0.01)
+        elif prog == 'mlip':
+            # Reuse the one already-loaded calculator (see below) instead of
+            # reloading the checkpoint for every image -- AutoNEB calls this
+            # repeatedly as it grows the band, and reloading UMA each time
+            # would be extremely slow (unlike MOPACamk, which is cheap to
+            # instantiate since it just wraps an external binary).
+            image.calc = mlip_calc_obj
+            image.info['charge'] = int(charge)
+            image.info['spin']   = mult
 #        elif prog == 'XTB': image.calc = XTB(method=method)
 
 def Energy_and_forces(geom):
@@ -277,12 +285,14 @@ inputfile = str(argv[1]) ; line = int(argv[2]) ; run_neb = int(argv[3]); e0 = fl
 system('rm -rf image*.traj')
 #Default parameters
 n_max,prefix,fmax,fmaxi,temp,fric,totaltime,dt,ExtForce,weight,k_neb,semax = 15,'image',0.1,0.025,0.,0.5,100,1,6,100,2,True
+mult = 1
 #n_max,prefix,fmax,fmaxi,temp,fric,totaltime,dt,ExtForce,weight = 10,'image',0.1,0.1,0.,0.5,100,1,6,100
 #Here we should read inputfile
 for linei in open(inputfile,'r'):
-    if search("LowLevel ", linei): prog   = str(linei.split()[1]) 
-    if search("LowLevel ", linei): method = ' '.join([str(elem) for elem in linei.split()[2:] ]) 
+    if search("LowLevel ", linei): prog   = str(linei.split()[1])
+    if search("LowLevel ", linei): method = ' '.join([str(elem) for elem in linei.split()[2:] ])
     if search("molecule ", linei): molecule = str(linei.split()[1])
+    if search("mult ", linei): mult = int(linei.split()[1])
     if search("Energy ", linei) and semax: emax = 1.5 * float(linei.split()[1]) 
     if search("Temperature ", linei) and semax: 
        temperature = float(linei.split()[1])
@@ -301,11 +311,19 @@ for linei in open(inputfile,'r'):
         else: brrng = False 
     if search("tsdirll ", linei): 
         path = str(linei.split()[1]) 
-try: 
+try:
     print('Path to files:',path)
 except:
     path = 'tsdirLL_'+molecule
     print('Path to files:',path)
+if prog == 'mlip':
+    from os import environ
+    import mlip_calc
+    models_dir = environ['AMK'] + '/models'
+    # Loaded once and reused everywhere a .calc is attached below (see
+    # attach_calculators): the UMA checkpoint is large enough that reloading
+    # it per-image/per-step would dominate the runtime.
+    mlip_calc_obj = mlip_calc.load_calculator(method, models_dir)
 #check inputfile
 if gto3d != 'Traj' and gto3d != 'POpt':
     print('Graphto3D valid values: Traj POpt')
@@ -338,6 +356,10 @@ natom = len(rmol)
 aton   = rmol.get_atomic_numbers()
 symb   = rmol.get_chemical_symbols()
 if prog == 'mopac': rmol.calc = MOPACamk(method=method+' threads=1 charge='+charge,relscf=0.01)
+elif prog == 'mlip':
+    rmol.calc = mlip_calc_obj
+    rmol.info['charge'] = int(charge)
+    rmol.info['spin']   = mult
 #elif prog == 'XTB': rmol.calc = XTB(method=method)
 #atoms_not_rxn
 latoms = [item for item in range(natom)]
@@ -489,7 +511,10 @@ if criteria > 0:
 ##################
  
 #ep = rmol.get_potential_energy() 
-ep = rmol.calc.get_final_heat_of_formation() * units.mol / units.kcal
+if prog == 'mopac':
+    ep = rmol.calc.get_final_heat_of_formation() * units.mol / units.kcal
+else:
+    ep = rmol.get_potential_energy() * units.mol / units.kcal
 dE = ep - e0
 print('{:s} {:10.4f} {:s}'.format('Product energy rel: ',dE,'kcal/mol'))
 print('{:s} {:10.4f} {:s}'.format('Product energy abs: ',ep,'kcal/mol'))
@@ -600,6 +625,38 @@ if prog == 'mopac':
                 p0 = run("cp ts.out ts_let.out",shell=True)
                 print('ERROR in MOPAC "ts let" calculation:',e)
 ###############################
+elif prog == 'mlip':
+    # Saddle search with Sella from the NEB-guessed TS, reusing the exact
+    # same optimizer/frequency/log-writing logic mlip_calc.py already uses
+    # for HL and for amk.sh/tors.sh's own TS searches, so the result (ts.out)
+    # is read the same way by check_ts_structure.sh -> get_ts_properties.sh
+    # (prog=3) as any other MLIP-found TS.
+    print("Trying TS opt with Sella (MLIP)")
+    try:
+        # Unlike MOPAC's internal "ts" task (which runs its own algorithm and
+        # never looks at ASE-level constraints), Sella is an ASE optimizer
+        # and *does* respect them -- clear whatever FixAtoms/FixBondLengths
+        # constraint this image inherited via .copy() from rmol/the NEB band
+        # so the saddle search runs over the full coordinate space, matching
+        # what the mopac branch above effectively does.
+        ts.set_constraint()
+        ts.calc = mlip_calc_obj
+        ts.info['charge'] = int(charge)
+        ts.info['spin']   = mult
+        converged = mlip_calc.run_tsopt(ts, 'ts')
+        energy_eV = ts.get_potential_energy()
+        freqs_cm, modes, zpe_eV, vib = mlip_calc.compute_frequencies(ts, 'ts_vib')
+        mlip_calc.write_log('ts.log', method, 'tsopt', ts, freqs_cm, zpe_eV, energy_eV, converged)
+        mlip_calc.write_molden_file(ts, freqs_cm, modes, 'ts.log')
+        vib.clean()
+        from os import replace as os_replace
+        os_replace('ts.log', 'ts.out')
+        print('{:s} {:10.4f}'.format('TS optimized energy:',energy_eV))
+        print('Lowest vibrational frequencies:',[float(x) for x in freqs_cm[:4]])
+        p = run("check_ts_structure.sh > ts.log",shell=True)
+        print(p)
+    except Exception as e:
+        print('ERROR in MLIP TS calculation:',e)
 #elif prog == 'XTB':
     #Dimer method for XTB (no internal optimizer)
     #vib calc. to get the lowest frequency mode

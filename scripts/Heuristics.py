@@ -199,12 +199,22 @@ for i in active:
 
 #rmol.calc is an instance of the mopac calculation
 #Determine initial energy e0 and bond order matrix bo
-if prog == 'mopac': rmol.calc = MOPACamk(method=method+' threads=1 charge='+charge,task=task)
+#Bond order (used below only to pre-screen which bonds are candidates for
+#dissociation, not for any final energetics -- those come from LocateTs.py
+#per channel) is a MOPAC-specific quantity with no generic ASE/UMA
+#equivalent, so this pre-screening step always uses MOPAC regardless of
+#which program the LL network itself is built with, exactly like
+#bond_order.py already does for the (unrelated) torsional-scan pre-screen.
+#`method` holds the LowLevel method string only when prog=='mopac'; for any
+#other prog (e.g. mlip's "uma"/"mace") it is not a MOPAC method, so fall
+#back to plain pm7 -- this is a topology pre-screen, not the LL method.
+bo_method = method if prog == 'mopac' else 'pm7'
+rmol.calc = MOPACamk(method=bo_method+' threads=1 charge='+charge,task=task)
 #elif prog == 'XTB': rmol.calc = XTB(method=method)
 opt = BFGS(rmol,logfile='bfgs.log')
 opt.run(fmax=1, steps=50)
 e0     = rmol.get_potential_energy() * mol / kcal
-if prog == 'mopac': bo = [float(item) for item in rmol.calc.get_bond_order()]
+bo = [float(item) for item in rmol.calc.get_bond_order()]
 #elif prog == 'XTB': 
 #    calc = Calculator(Param.GFN2xTB,aton,rmol.get_positions() / Bohr) 
 #    calc.set_verbosity(0)

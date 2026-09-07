@@ -156,7 +156,8 @@ function err_report2 {
 
 #function to cleanup on exit
 function cleanup {
-    rm -rf ${tmp_files[@]} 
+    if [ -n "$mlip_server_pid" ]; then mlip_server_stop ; fi
+    rm -rf ${tmp_files[@]}
     echo ""
     echo "Cleaning up tmp files and exiting $exe"
 }
@@ -214,7 +215,7 @@ function read_input {
       temperature=$tread
    fi
    energy=$(awk 'BEGIN{e=0};{if($1=="Energy") e=$2};END{printf "%d",e+0.5}'  $inputfile) 
-   method=$(awk 'BEGIN{llcalc="pm7 threads=1"};{if($1=="LowLevel" && $2=="mopac") {$1="";$2="";llcalc=$0" threads=1"}; if($1=="LowLevel" && $2=="qcore") llcalc="xtb"};END{print llcalc}' $inputfile)
+   method=$(awk 'BEGIN{llcalc="pm7 threads=1"};{if($1=="LowLevel" && $2=="mopac") {$1="";$2="";llcalc=$0" threads=1"}; if($1=="LowLevel" && $2=="qcore") llcalc="xtb"; if($1=="LowLevel" && $2=="mlip") llcalc=tolower($3)};END{print llcalc}' $inputfile)
    tsdirhl=$(awk '{if($1 == "tsdirhl") {print $2;nend=1}};END{if(nend==0) print "'$cwd'/tsdirHL_'$molecule'"}' $inputfile)
    wrkmode=$(awk 'BEGIN{mode=1};{if($1=="post_proc" && $2=="bbfs" && NF==4) mode=$4};END{if(mode!=1) mode=0;print mode}' $inputfile)
 ##templates for mopac calcs
@@ -311,7 +312,45 @@ function read_input {
          exit
       fi
    fi
-   if [ $wrkmode -eq 0 ]; then 
+###LL characterization program (thermo/IRC/min opt performed once a TS candidate
+###has been located by $program_md/$program_opt). Defaults to $program_opt, so
+###existing input files are unaffected unless LowLevel_IRC is used.
+   program_irc=$(awk 'BEGIN{pirc="'$program_opt'"};{if($1=="LowLevel_IRC") {pirc=$2}};END{print tolower(pirc)}' $inputfile)
+###MLIP model name: whichever of LowLevel/LowLevel_TSopt/LowLevel_IRC is set
+###to "mlip" carries the model as its 3rd token (e.g. "LowLevel mlip uma").
+###Only one model is kept for the whole LL pipeline (sampling+TSopt+IRC/min),
+###picked most-specific-first, matching how program_irc/program_opt cascade.
+   ll_mlip_model=""
+   if [ "$program_irc" = "mlip" ]; then
+      ll_mlip_model="$(awk '{if($1=="LowLevel_IRC") print tolower($3)}' $inputfile)"
+   fi
+   if [ -z "$ll_mlip_model" ] && [ "$program_opt" = "mlip" ]; then
+      ll_mlip_model="$(awk '{if($1=="LowLevel_TSopt") print tolower($3)}' $inputfile)"
+   fi
+   if [ -z "$ll_mlip_model" ] && [ "$program_md" = "mlip" ]; then
+      ll_mlip_model="$(awk '{if($1=="LowLevel") print tolower($3)}' $inputfile)"
+   fi
+   if [ "$program_md" = "mlip" ] || [ "$program_opt" = "mlip" ] || [ "$program_irc" = "mlip" ]; then
+      models_dir="${AMK}/models"
+      export ll_mlip_model models_dir
+      if [ "$ll_mlip_model" != "uma" ] && [ "$ll_mlip_model" != "mace" ]; then
+         echo "mlip requires a model name, e.g.: LowLevel mlip uma (or mace)"
+         exit 1
+      fi
+      if [ "$ll_mlip_model" = "uma" ]; then
+         model_file_check="${models_dir}/uma-m-1p1.pt"
+      else
+         model_file_check="${models_dir}/MACE-omol-0-extra-large-1024.model"
+      fi
+      if [ ! -f "$model_file_check" ]; then
+         echo "MLIP model not found: $model_file_check"
+         exit 1
+      fi
+      # MLIP does not compute a Gibbs free energy correction (see get_G_mlip.sh);
+      # force microcanonical (E+ZPE) sorting so that step is not silently misused.
+      rate=1
+   fi
+   if [ $wrkmode -eq 0 ]; then
       if [ "$program_opt" = "qcore" ];then
          ts_template="$(cat $sharedir/ts_templateslow | sed 's/method/pm7 charge='$charge'/g')" 
       else
@@ -331,7 +370,7 @@ function read_input {
    else
       bo_template="$(sed 's/method/'"$method"' charge='$charge' BONDS INT/g' $sharedir/freq_template1)"
    fi
-   prog=$(awk '{if("'$program_opt'"=="xtb") prog=-1;if("'$program_opt'"=="qcore") prog=0;if("'$program_opt'"=="mopac") prog=1; if("'$program_opt'"~/g[01][96]/) prog=2};END{print prog}' $inputfile)
+   prog=$(awk '{if("'$program_opt'"=="xtb") prog=-1;if("'$program_opt'"=="qcore") prog=0;if("'$program_opt'"=="mopac") prog=1; if("'$program_opt'"~/g[01][96]/) prog=2; if("'$program_opt'"=="mlip") prog=3};END{print prog}' $inputfile)
    method_opt=$(awk 'BEGIN{llcalc="pm7"};{if($1=="LowLevel_TSopt") {llcalc=$3}};END{print tolower(llcalc)}' $inputfile)
    LLcalc=$(echo "$method_opt" | sed 's@/@ @g;s@u@@g' | awk 'BEGIN{IGNORECASE=1};{if($1=="hf") m="HF";else if($1=="mp2") m="MP2"; else if($1=="ccsd(t)") m="CCSDT";else m="DFT"};END{print m}' )
    atom1rot=$(awk 'BEGIN{ff=-1};{if($1=="rotate") ff=$2;if(ff=="com") ff=-1};END{print ff}' $inputfile)
@@ -931,6 +970,56 @@ if [ $sampling -ne 4 ]; then
 fi
 }
 
+## Persistent mlip_calc.py worker for one amk.sh batch. Loading the UMA
+## checkpoint is ~80% of a single mlip_calc.py call's wall time; amk.sh's
+## trajectory loop makes many such calls per batch (one MD run plus one
+## partial_opt+tsopt pair per bond-change event it detects), each currently
+## paying that reload cost again. Only worth it for uma -- mace's checkpoint
+## loads in under a second, nothing to amortize there.
+function mlip_server_start {
+   mlip_req_fifo="${cwd}/.mlip_req_$$.fifo"
+   mlip_resp_fifo="${cwd}/.mlip_resp_$$.fifo"
+   rm -f "$mlip_req_fifo" "$mlip_resp_fifo"
+   mkfifo "$mlip_req_fifo" "$mlip_resp_fifo"
+   mlip_calc.py serve "$mlip_req_fifo" "$mlip_resp_fifo" $ll_mlip_model $models_dir $charge $mult \
+      &> mlip_server.log &
+   mlip_server_pid=$!
+}
+
+## batch1..batchN directory names are reused every iteration (runGP.sh does
+## an unconditional "rm -r $batch" before dispatching each new job into that
+## slot), so a leaked server here doesn't just waste GPU memory for the rest
+## of this run -- it also keeps competing with every later iteration's fresh
+## servers on the same GPU. echo > fifo blocks until a reader opens it, so if
+## the server isn't back at its idle read loop for any reason, a plain
+## "send QUIT and wait" can hang forever with no fallback. Bound it: give it
+## 10s to shut down gracefully, then kill -9 unconditionally.
+function mlip_server_stop {
+   if [ -n "$mlip_server_pid" ] && kill -0 $mlip_server_pid 2>/dev/null; then
+      ( echo "QUIT" > "$mlip_req_fifo" ) 2>/dev/null &
+      local writer_pid=$!
+      local waited=0
+      while kill -0 $mlip_server_pid 2>/dev/null && [ $waited -lt 10 ]; do
+         sleep 1
+         waited=$((waited+1))
+      done
+      kill -9 $writer_pid 2>/dev/null
+      kill -9 $mlip_server_pid 2>/dev/null
+      wait $mlip_server_pid 2>/dev/null
+   fi
+   rm -f "$mlip_req_fifo" "$mlip_resp_fifo"
+   mlip_server_pid=""
+}
+
+## Usage: mlip_request "<calctype> <arg1> <arg2> ..." -- same tail normally
+## passed to `mlip_calc.py <calctype> ...` on the command line. Blocks until
+## the persistent server finishes the job; the caller still checks for the
+## expected output file / AMK_TERMINATED_NORMALLY same as a direct call.
+function mlip_request {
+   echo "$1" > "$mlip_req_fifo"
+   read -r mlip_resp < "$mlip_resp_fifo"
+}
+
 function opt_start {
 echo "Optimizing the starting structure"
 if [ ! -f ${molecule}_freq.out ]; then
@@ -964,6 +1053,20 @@ if [ ! -f ${molecule}_freq.out ]; then
       fi
    elif [ "$program_md" = "xtb" ]; then
       cp react.xyz opt_start.xyz
+   elif [ "$program_md" = "mlip" ]; then
+      cp ${molecule}.xyz optstart_ref.xyz
+      if [ -n "$mlip_server_pid" ]; then
+         mlip_request "minopt optstart_ref.xyz"
+      else
+         mlip_calc.py minopt optstart_ref.xyz $ll_mlip_model $models_dir $charge $mult
+      fi
+      if [ ! -f optstart_ref.log ] || ! grep -q AMK_TERMINATED_NORMALLY optstart_ref.log; then
+         echo "The input structure could not be optimized. Check your XYZ file"
+         exit
+      fi
+      cp optstart_ref.log ${molecule}_freq.out
+      geo_min="$(get_geom_mlip.sh ${molecule}_freq.out)"
+      printf "%s\n\n%s\n" "$natom" "$geo_min" > opt_start.xyz
    fi
    cp opt_start.xyz ${molecule}.xyz
 fi
@@ -979,12 +1082,19 @@ if [ -f $tsdirll/MINs/min.db ]; then
    elif [ "$program_opt" = "xtb" ]; then
       e0=$(sqlite3 ${tsdirll}/MINs/min.db "select energy from min where name='min0_0'")
       e0=$(echo "scale=6; $e0*23.06" | bc | awk '{printf "%14.6f",$1}')
-   fi 
+   elif [ "$program_opt" = "mlip" ]; then
+      e0=$(sqlite3 ${tsdirll}/MINs/min.db "select energy from min where name='min0_0'")
+      e0=$(echo "scale=6; $e0/627.51" | bc | awk '{printf "%14.6f",$1}')
+      emaxts=$(echo "scale=6; $emaxts/627.51" | bc | awk '{printf "%14.6f",$1}')
+   fi
 else
    if [ "$program_opt" = "mopac" ]; then
       e0=$(awk '/FINAL HEAT OF FORMATION =/{e0=$6};END{print e0}' ${molecule}_freq.out )
    elif [ "$program_opt" = "qcore" ]; then
       e0=$(awk '/Energy=/{e0=$2};END{print e0}' ${molecule}_freq.out )
+      emaxts=$(echo "scale=6; $emaxts/627.51" | bc | awk '{printf "%14.6f",$1}')
+   elif [ "$program_opt" = "mlip" ]; then
+      e0=$(get_energy_mlip.sh ${molecule}_freq.out | awk '{printf "%14.6f",$1}')
       emaxts=$(echo "scale=6; $emaxts/627.51" | bc | awk '{printf "%14.6f",$1}')
    elif [ "$program_opt" = "xtb" ]; then
       e0=$(awk '/Energy=/{e0=$2};END{print e0}' ${molecule}_freq.out )
@@ -2114,4 +2224,132 @@ function launch_mopac_TS {
       fi
    fi
 ###
+}
+
+##################################################
+## LL characterization with an MLIP (LowLevel_IRC mlip uma|mace)
+##
+## TS candidates are still located by $program_md/$program_opt (e.g. MOPAC
+## dynamics + BBFS); these functions take those already-located TS geometries
+## and re-optimize/characterize them (TS reopt+freq, IRC, minf/minr opt+freq)
+## on the MLIP surface, reusing mlip_calc.py exactly as HLscripts/TS.sh,
+## IRC.sh and MIN.sh already do for High Level.
+##################################################
+
+##min0 (the reference structure) must be on the same PES as everything else,
+##so it is (re)optimized with the MLIP too, mirroring the mopac/qcore branches
+##right above this function's call site in irc.sh. Sets: name geom e0 zpe0
+##g_corr0 freq sigma (same variables the mopac/qcore branches set) and leaves
+##a min0.out marker file behind so the "already done" check in irc.sh works
+##unchanged across all three programs.
+function run_ll_mlip_min0 {
+   cp ${molecule}_ref.xyz min0_0.xyz
+   mlip_calc.py minopt min0_0.xyz $ll_mlip_model $models_dir $charge $mult
+   cp min0_0.log $tsdirll/MINs/min0.out
+   if [ -f min0_0.molden ]; then mv min0_0.molden $tsdirll/MINs/min0.molden ; fi
+   geom="$(get_geom_mlip.sh $tsdirll/MINs/min0.out)"
+   e0=$(get_energy_mlip.sh $tsdirll/MINs/min0.out | awk '{printf "%10.2f",$1*627.51}')
+   zpe0=$(get_ZPE_mlip.sh $tsdirll/MINs/min0.out)
+   g_corr0=$(get_G_mlip.sh $tsdirll/MINs/min0.out)
+   freq="$(get_freq_mlip.sh $tsdirll/MINs/min0.out)"
+   sigma=$(get_sigma_mlip.sh $tsdirll/MINs/min0.out)
+}
+
+##Called from irc.sh instead of the per-TS mopac/qcore loop when
+##program_irc=mlip. Re-optimizes every TS in tslistll on the MLIP surface
+##(batched: the model is loaded once) and, for those that succeed, runs the
+##forward/reverse IRC from the MLIP-optimized TS (also batched). TS-search
+##itself (program_opt) is untouched.
+function run_ll_mlip_ts_irc {
+   if [ "$program_opt" = "mlip" ]; then
+      # TSs were already located AND optimized with the MLIP during the
+      # search step (amk.sh's program_opt=mlip branch) -- ${tsdirll}/${name}.out
+      # is already an AMK_MLIP log, not a mopac one. Just relocate it instead
+      # of re-optimizing it a second time.
+      echo "TSs already optimized with MLIP during the search step; skipping re-optimization"
+      for name in $(awk '{print $3}' $tslistll)
+      do
+         if [ -f ${tsdirll}/TSs/${name}.log ] && grep -q AMK_TERMINATED_NORMALLY ${tsdirll}/TSs/${name}.log; then
+            continue
+         fi
+         cp ${tsdirll}/${name}.out ${tsdirll}/TSs/${name}.log
+         if [ -f ${tsdirll}/${name}.molden ]; then cp ${tsdirll}/${name}.molden ${tsdirll}/TSs/${name}.molden ; fi
+      done
+   else
+      echo "Re-optimizing TSs with MLIP ($ll_mlip_model)"
+      sqlite3 ${tsdirll}/TSs/inputs.db "drop table if exists gaussian; create table gaussian (id INTEGER PRIMARY KEY,name TEXT, input TEXT, unique(name));"
+      mts=0
+      for name in $(awk '{print $3}' $tslistll)
+      do
+         if [ -f ${tsdirll}/TSs/${name}.log ] && grep -q AMK_TERMINATED_NORMALLY ${tsdirll}/TSs/${name}.log; then
+            continue
+         fi
+         ((mts=mts+1))
+         geo="$(get_geom_mopac.sh $tsdirll/${name}.out | awk '{if(NF==4) print $0}')"
+         inp="$(printf "%s\n\n%s" "$natom" "$geo")"
+         echo -e "insert or ignore into gaussian values (NULL,'$name','$inp');\n.quit" | sqlite3 ${tsdirll}/TSs/inputs.db
+      done
+      echo "Performing a total of $mts TS re-optimizations with MLIP"
+      if [ $mts -gt 0 ]; then
+         mlip_calc.py batch tsopt ${tsdirll}/TSs $ll_mlip_model $models_dir $charge $mult
+      fi
+   fi
+
+   echo "Running IRCs with MLIP ($ll_mlip_model)"
+   sqlite3 ${tsdirll}/IRC/inputs.db "drop table if exists gaussian; create table gaussian (id INTEGER PRIMARY KEY,name TEXT, input TEXT, unique(name));"
+   mirc=0
+   for name in $(awk '{print $3}' $tslistll)
+   do
+      if [ ! -f ${tsdirll}/TSs/${name}.log ] || ! grep -q AMK_TERMINATED_NORMALLY ${tsdirll}/TSs/${name}.log; then
+         echo "$name: MLIP TS opt failed or missing, skipping IRC"
+         continue
+      fi
+      if [ -f ${tsdirll}/IRC/ircf_${name}.log ] && [ -f ${tsdirll}/IRC/ircr_${name}.log ] && \
+         grep -q AMK_TERMINATED_NORMALLY ${tsdirll}/IRC/ircf_${name}.log && \
+         grep -q AMK_TERMINATED_NORMALLY ${tsdirll}/IRC/ircr_${name}.log; then
+         continue
+      fi
+      ((mirc=mirc+1))
+      geo="$(get_geom_mlip.sh ${tsdirll}/TSs/${name}.log)"
+      inp="$(printf "%s\n\n%s" "$natom" "$geo")"
+      echo -e "insert or ignore into gaussian values (NULL,'ircf_$name','$inp');\n.quit" | sqlite3 ${tsdirll}/IRC/inputs.db
+      echo -e "insert or ignore into gaussian values (NULL,'ircr_$name','$inp');\n.quit" | sqlite3 ${tsdirll}/IRC/inputs.db
+   done
+   echo "Performing a total of $mirc IRC calculations with MLIP"
+   if [ $mirc -gt 0 ]; then
+      mlip_calc.py batch irc ${tsdirll}/IRC $ll_mlip_model $models_dir $charge $mult
+   fi
+}
+
+##Called from min.sh instead of doparallel/runmin.sh when program_irc=mlip.
+##Optimizes the forward/reverse IRC endpoints (minf_/minr_) with the MLIP,
+##batched in the same $tsdirll/IRC/inputs.db that run_ll_mlip_ts_irc uses.
+function run_ll_mlip_minfr {
+   echo "Optimizing IRC endpoints (minf/minr) with MLIP ($ll_mlip_model)"
+   sqlite3 ${tsdirll}/IRC/inputs.db "drop table if exists gaussian; create table gaussian (id INTEGER PRIMARY KEY,name TEXT, input TEXT, unique(name));"
+   m=0
+   for name in $(ls $tsdirll/TSs/*.log 2>/dev/null | sed 's/\.log//g' | sed 's/\// /g' | awk '{print $NF}')
+   do
+      if [ -f ${tsdirll}/IRC/minf_${name}.log ] && [ -f ${tsdirll}/IRC/minr_${name}.log ] && \
+         grep -q AMK_TERMINATED_NORMALLY ${tsdirll}/IRC/minf_${name}.log && \
+         grep -q AMK_TERMINATED_NORMALLY ${tsdirll}/IRC/minr_${name}.log; then
+         echo "Calcs completed for" $name
+         continue
+      fi
+      if [ ! -f ${tsdirll}/IRC/ircf_${name}_last.xyz ] || [ ! -f ${tsdirll}/IRC/ircr_${name}_last.xyz ]; then
+         echo "$name: IRC endpoints missing, skipping min opt"
+         continue
+      fi
+      ((m=m+1))
+      geof="$(awk 'NR>2{print $0}' ${tsdirll}/IRC/ircf_${name}_last.xyz)"
+      geor="$(awk 'NR>2{print $0}' ${tsdirll}/IRC/ircr_${name}_last.xyz)"
+      inpf="$(printf "%s\n\n%s" "$natom" "$geof")"
+      inpr="$(printf "%s\n\n%s" "$natom" "$geor")"
+      echo -e "insert or ignore into gaussian values (NULL,'minf_$name','$inpf');\n.quit" | sqlite3 ${tsdirll}/IRC/inputs.db
+      echo -e "insert or ignore into gaussian values (NULL,'minr_$name','$inpr');\n.quit" | sqlite3 ${tsdirll}/IRC/inputs.db
+   done
+   echo "Performing a total of $m min calculations with MLIP"
+   if [ $m -gt 0 ]; then
+      mlip_calc.py batch minopt ${tsdirll}/IRC $ll_mlip_model $models_dir $charge $mult
+   fi
 }

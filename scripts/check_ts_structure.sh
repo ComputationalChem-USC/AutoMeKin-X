@@ -52,7 +52,7 @@ if [[ ("$fi" -ge "$imag") ]]; then
          cp ${file} ${tsdirll}/${name}.out
          if [ -f ${fileden} ]; then cp ${fileden} ${tsdirll}/${name}.den ; fi
          printf "     Pt%2s: TS optimized and added to ts list\n" $npo
-         if [ "$program_opt" = "xtb" ]; then mv ts.molden $tsdirll/${name}.molden ; fi
+         if [ "$program_opt" = "xtb" ] || [ "$program_opt" = "mlip" ]; then mv ts.molden $tsdirll/${name}.molden ; fi
          if [ "$program_opt" = "mopac" ]; then get_NM_mopac.sh $tsdirll/${name}.out $tsdirll/${name} ; fi
       else
          printf "     Pt%2s: TS optimized but not added-->redundant with ts %4s\n" $npo $ok
@@ -64,7 +64,7 @@ if [[ ("$fi" -ge "$imag") ]]; then
       cp ${file} ${tsdirll}/${name}.out
       if [ -f ${fileden} ]; then cp ${fileden} ${tsdirll}/${name}.den ; fi
       printf "     Pt%2s: TS optimized and added to ts list\n" $npo
-      if [ "$program_opt" = "xtb" ]; then mv ts.molden $tsdirll/${name}.molden ; fi
+      if [ "$program_opt" = "xtb" ] || [ "$program_opt" = "mlip" ]; then mv ts.molden $tsdirll/${name}.molden ; fi
       if [ "$program_opt" = "mopac" ]; then get_NM_mopac.sh $tsdirll/${name}.out $tsdirll/${name} ; fi
    fi
    ) 200>>${tslistll}.lock

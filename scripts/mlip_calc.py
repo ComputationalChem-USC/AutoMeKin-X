@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-MLIP calculator for AutoMeKin HL calculations.
+MLIP calculator for AutoMeKin HL and LL calculations.
 
 Single mode:
   mlip_calc.py tsopt|minopt <xyzfile> <model> <models_dir> <charge> <mult>
@@ -14,13 +14,49 @@ Name-based calctype dispatch in batch mode:
   ircr* → ircr     (IRC reverse)
   ts*   → tsopt (or whatever calctype is given on the command line)
 
+LL reactive-sampling modes (used by amk.sh when LowLevel is mlip):
+  mlip_calc.py md <xyzfile> <model> <models_dir> <charge> <mult> <temp_K> <duration_fs> [timestep_fs]
+      NVE trajectory from Maxwell-Boltzmann initial velocities at temp_K,
+      written as a plain multi-frame XYZ (<name>_traj.xyz, ~1 frame/fs) so it
+      can be piped through snapshots_mopac.sh into bbfs.exe unchanged.
+
+  mlip_calc.py partial_opt <xyzfile> <frozen_csv> <model> <models_dir> <charge> <mult>
+      Relaxes every atom NOT listed in <frozen_csv> (comma-separated, 1-based,
+      matching the fort.NNN convention bbfs.exe/amk.sh already use for other
+      programs) while holding the listed ones fixed. Writes <name>_popt.xyz.
+      This is a plain constrained minimization (FIRE), not a saddle search;
+      feed the result to "tsopt" to actually locate the TS.
+
+  mlip_calc.py dihedral_scan <xyzfile> <a1,a2,a3,a4> <dihed0_deg> <model> <models_dir> <charge> <mult> [npoints] [step_deg]
+      Relaxed torsional scan (used by tors.sh's mlip branch): npoints steps
+      of step_deg starting at dihed0_deg, each relaxed with that one dihedral
+      fixed. Writes tors.out in the same text format tors.sh's qcore branch
+      already produces, so the shared local-maximum finder there is unchanged.
+
+Persistent-server mode (loads model once, then services jobs one at a time
+read from a fifo -- used by amk.sh for the UMA path, where model loading is
+~80% of a single call's wall time; not wired up for mace, whose checkpoint
+loads in under a second so there is nothing to amortize):
+  mlip_calc.py serve <req_fifo> <resp_fifo> <model> <models_dir> <charge> <mult>
+      Each line read from req_fifo is "<calctype> <args...>", the same
+      tail normally passed on the command line for md/partial_opt/tsopt/minopt.
+      Writes "DONE" or "ERROR: <msg>" to resp_fifo after each job. A "QUIT"
+      line ends the loop.
+
 Supported models: uma, mace
 """
 import os
+
+# Set before any ML library is imported (jaxlib/absl read these at load time).
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')  # silence XLA/absl C++ logs (cpu_aot_loader, etc.)
+os.environ.setdefault('JAX_PLATFORMS', 'cpu')        # skip GPU probing; jax is only an indirect dep here, unused for compute
+
 import re
 import sys
 import sqlite3
 import traceback
+import warnings
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -30,12 +66,27 @@ from ase.units import Hartree, kcal, mol
 import torch
 torch.set_num_threads(1)
 
+logging.getLogger().setLevel(logging.ERROR)
+warnings.filterwarnings('ignore', message="Can't initialize NVML")
+warnings.filterwarnings('ignore', category=FutureWarning, module='ase.optimize.optimize')
+warnings.filterwarnings('ignore', message=r".*weights_only.*")
+
 # IRC parameters
 IRC_DX    = 0.08   # amu^0.5 * Å, step size along IRC
 IRC_ETA   = 1e-4
 IRC_GAMMA = 0.4
 IRC_FMAX  = 0.01   # eV/Å — looser than TS opt to walk the full IRC path
 IRC_STEPS = 1000
+
+# Post-minopt imaginary-frequency check. Below this magnitude, a negative
+# frequency is treated as Eckart-projection numerical noise (e.g. extra
+# near-zero directions left over when a "product" is actually several
+# weakly-interacting dissociated fragments, for which the 6 global T+R modes
+# removed by _project_trans_rot aren't the full story) rather than a genuine
+# unstable mode. Above it, the structure is not accepted as a true minimum.
+MIN_IMAG_NOISE_CM   = 50.0
+MIN_IMAG_MAX_RETRY  = 3
+MIN_IMAG_DISPLACE_A = 0.3  # Å, step along the imaginary mode before re-relaxing
 
 
 def get_device():
@@ -76,7 +127,7 @@ def load_calculator(model_name, models_dir):
         if not model_path.exists():
             raise FileNotFoundError(f"MACE model not found: {model_path}")
         return MACECalculator(
-            model_paths=str(model_path), device=device, default_dtype='float64'
+            model_paths=str(model_path), device=device, default_dtype='float32'
         )
 
     else:
@@ -99,6 +150,38 @@ def run_minopt(atoms, name, fmax=0.005, steps=500):
     converged = dyn.run(fmax=fmax, steps=steps)
     print(f"  Steps: {dyn.nsteps}, Converged: {converged}", flush=True)
     return converged
+
+
+def run_minopt_verified(atoms, name, fmax=0.005, steps=500):
+    """Optimize to a minimum, then check via frequency analysis that no real
+    (non-noise) imaginary mode remains. A minimum with a genuine imaginary
+    frequency isn't actually a minimum -- if one shows up, displace the
+    geometry along that mode and re-relax, up to MIN_IMAG_MAX_RETRY times,
+    before giving up.
+
+    Returns (converged, freqs_cm, modes, zpe_eV, vib, is_true_min)."""
+    converged = run_minopt(atoms, name, fmax=fmax, steps=steps)
+    freqs_cm, modes, zpe_eV, vib = compute_frequencies(atoms, f"{name}_vib")
+
+    attempt = 0
+    while freqs_cm.size and freqs_cm[0] < -MIN_IMAG_NOISE_CM and attempt < MIN_IMAG_MAX_RETRY:
+        attempt += 1
+        print(f"  Real imaginary mode ({freqs_cm[0]:.1f} cm^-1) after min opt -- "
+              f"displacing along it and re-relaxing (retry {attempt}/{MIN_IMAG_MAX_RETRY})",
+              flush=True)
+        disp = np.asarray(modes[0])
+        disp = disp / np.linalg.norm(disp)
+        vib.clean()
+        atoms.positions = atoms.positions + MIN_IMAG_DISPLACE_A * disp
+        converged = run_minopt(atoms, name, fmax=fmax, steps=steps)
+        freqs_cm, modes, zpe_eV, vib = compute_frequencies(atoms, f"{name}_vib")
+
+    is_true_min = not (freqs_cm.size and freqs_cm[0] < -MIN_IMAG_NOISE_CM)
+    if not is_true_min:
+        print(f"  WARNING: {name} still has an imaginary mode ({freqs_cm[0]:.1f} cm^-1) "
+              f"after {MIN_IMAG_MAX_RETRY} retries; not accepting as a converged minimum",
+              flush=True)
+    return converged, freqs_cm, modes, zpe_eV, vib, is_true_min
 
 
 def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
@@ -124,14 +207,113 @@ def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
     return converged
 
 
-def run_frequencies(atoms, vib_name):
-    from ase.vibrations import Vibrations
-    print("  Computing vibrational frequencies...", flush=True)
-    vib = Vibrations(atoms, name=vib_name)
-    vib.run()
-    freqs  = vib.get_frequencies()
-    zpe_eV = vib.get_zero_point_energy()
-    return freqs, zpe_eV, vib  # caller must call vib.clean() after Molden writing
+def run_md(atoms, name, temp_K, duration_fs, timestep_fs=0.5):
+    """NVE trajectory from Maxwell-Boltzmann initial velocities.
+
+    Writes a plain multi-frame XYZ (element x y z, no extra columns) at
+    ~1 frame/fs, matching the frame-per-fs convention the rest of AMK's LL
+    pipeline (irange, nfs, snapshots_mopac.sh, bbfs.exe) already assumes.
+
+    The input geometry is already relaxed (opt_start/sel_mol.sh optimize it
+    before amk.sh ever calls this), so at t=0 all of the assigned thermal
+    energy is kinetic and none is potential. Under NVE that energy
+    equilibrates between the two over the first several vibrational periods,
+    so the time-averaged temperature the trajectory actually samples ends up
+    well below temp_K -- roughly half, in the harmonic-oscillator limit
+    (virial theorem). FAIR's own UMA MD example initializes at 2x the target
+    temperature for exactly this reason; the same factor is used here so
+    temp_K (which callers set from amk.dat's `temp`) matches the intended
+    excitation instead of silently under-driving the reactive sampling."""
+    from ase.md.velocitydistribution import MaxwellBoltzmannDistribution, Stationary, ZeroRotation
+    from ase.md.verlet import VelocityVerlet
+    from ase import units as ase_units
+
+    EQUIPARTITION_FACTOR = 2.0
+    MaxwellBoltzmannDistribution(atoms, temperature_K=temp_K * EQUIPARTITION_FACTOR)
+    Stationary(atoms)
+    if len(atoms) > 2:
+        ZeroRotation(atoms)
+
+    dyn = VelocityVerlet(atoms, timestep=timestep_fs * ase_units.fs)
+    dump_every = max(1, round(1.0 / timestep_fs))   # ~1 frame per fs
+    nsteps = max(1, round(duration_fs / timestep_fs))
+
+    traj_path = f"{name}_traj.xyz"
+
+    def dump(f):
+        symbols = atoms.get_chemical_symbols()
+        positions = atoms.get_positions()
+        f.write(f"{len(atoms)}\n\n")
+        for sym, pos in zip(symbols, positions):
+            f.write(f"{sym} {pos[0]:14.8f} {pos[1]:14.8f} {pos[2]:14.8f}\n")
+
+    with open(traj_path, 'w') as f:
+        dump(f)
+        for step in range(nsteps):
+            dyn.run(1)
+            if (step + 1) % dump_every == 0:
+                dump(f)
+
+    return traj_path
+
+
+def run_partial_opt(atoms, name, frozen_indices, fmax=0.05, steps=300):
+    """Relax everything except frozen_indices (0-based). Not a saddle search
+    -- this only gives a better-conditioned starting point for a subsequent
+    TS search, mirroring what the mopac/qcore partial-opt step already does."""
+    from ase.constraints import FixAtoms
+    from ase.optimize import FIRE
+    if frozen_indices:
+        atoms.set_constraint(FixAtoms(indices=frozen_indices))
+    dyn = FIRE(atoms, logfile=f'{name}_popt.log')
+    converged = dyn.run(fmax=fmax, steps=steps)
+    return converged
+
+
+def run_dihedral_scan(atoms, dihedral_indices, dihed0, npoints=36, step_deg=10.0,
+                       fmax=0.05, steps=300):
+    """Relaxed dihedral scan used by tors.sh to locate torsional TSs.
+
+    For each target angle, starts fresh from the input geometry (matching
+    the qcore branch's own "cp mingeom min.xyz" reset every point, not a
+    propagated/sequential scan), fixes that one dihedral there with
+    FixInternals and relaxes everything else. Writes tors.out in the same
+    "POTENTIAL ENERGY SURFACE SCAN" text block format the qcore branch
+    already produces (see tors.sh), so tors.sh's shared local-maximum finder
+    (plain awk, untouched) works on it without any format-specific change."""
+    from ase.constraints import FixInternals
+    from ase.optimize import FIRE
+
+    a1, a2, a3, a4 = dihedral_indices
+    ref_positions = atoms.get_positions().copy()
+    symbols = atoms.get_chemical_symbols()
+    eV_to_kcalmol = mol / kcal
+
+    lines = ["POTENTIAL ENERGY SURFACE SCAN\n"]
+    for i in range(npoints):
+        target = dihed0 + i * step_deg
+        atoms.set_constraint()
+        atoms.set_positions(ref_positions)
+        atoms.set_dihedral(a1, a2, a3, a4, target)
+        try:
+            atoms.set_constraint(FixInternals(dihedrals_deg=[[target, [a1, a2, a3, a4]]]))
+            dyn = FIRE(atoms, logfile=None)
+            dyn.run(fmax=fmax, steps=steps)
+            energy_kcal = atoms.get_potential_energy() * eV_to_kcalmol
+        except Exception as e:
+            print(f"  Point {i+1} ({target:.1f} deg): failed ({e})", flush=True)
+            continue
+        finally:
+            atoms.set_constraint()
+
+        lines.append("  VARIABLE        FUNCTION\n")
+        lines.append(f"{target:10.1f}  -  {energy_kcal:13.3f}\n")
+        lines.append("\n\n\n")
+        for sym, pos in zip(symbols, atoms.get_positions()):
+            lines.append(f"{sym} {pos[0]:14.8f} {pos[1]:14.8f} {pos[2]:14.8f}\n")
+
+    with open("tors.out", "w") as f:
+        f.writelines(lines)
 
 
 def _project_trans_rot(atoms, hessian_2d):
@@ -172,50 +354,78 @@ def _project_trans_rot(atoms, hessian_2d):
     return Hmw_proj * np.outer(sqrt_m, sqrt_m), n_rt
 
 
-def write_molden_file(atoms, vib, log_path):
-    """Write Molden file with geometry and normal modes alongside the log.
+def compute_frequencies(atoms, vib_name):
+    """Finite-difference Hessian -> Eckart-projected frequencies.
 
-    Frequencies/modes come from an Eckart-projected Hessian (see
-    _project_trans_rot) rather than ASE's raw spectrum, so that translation
-    and rotation are removed exactly instead of guessed by magnitude."""
+    Translation and rotation are removed *exactly* via _project_trans_rot,
+    not by discarding whatever falls below an arbitrary |freq| cutoff. ASE's
+    raw, unprojected spectrum can leave several cm^-1 of rotational noise --
+    common with the noisier gradients of an ML potential -- that a cutoff
+    around 10 cm^-1 does not reliably catch. Left unprojected, that residual
+    mode is indistinguishable from a second reaction-coordinate frequency and
+    causes AMK's "exactly one imaginary frequency" TS check to reject
+    perfectly good saddle points.
+
+    Returns (freqs_cm, modes, zpe_eV, vib): freqs_cm is a real array ordered
+    imaginary/most-negative first (negative = imaginary, matching MOPAC/QC
+    convention) with the n_rt translation/rotation modes already excluded;
+    modes are the matching Cartesian displacement arrays (for Molden only).
+    Caller must call vib.clean() once done with vib."""
+    from ase.vibrations import Vibrations
     from ase.vibrations.data import VibrationsData
     from ase.units import invcm
 
+    print("  Computing vibrational frequencies...", flush=True)
+    vib = Vibrations(atoms, name=vib_name)
+    vib.run()
+
+    hessian_2d         = vib.get_vibrations().get_hessian_2d()
+    hessian_proj, n_rt  = _project_trans_rot(atoms, hessian_2d)
+    vib_data            = VibrationsData.from_2d(atoms, hessian_proj)
+    energies, modes      = vib_data.get_energies_and_modes()
+
+    freqs_cm_all = np.where(np.abs(energies.imag) > 1e-6,
+                             -energies.imag, energies.real) / invcm
+    order = np.argsort(np.abs(freqs_cm_all))
+    # drop the n_rt modes closest to zero (now cleanly the trans/rot ones),
+    # then order what's left with imaginary/most-negative first
+    keep = sorted(order[n_rt:], key=lambda i: freqs_cm_all[i])
+
+    freqs_cm    = freqs_cm_all[keep]
+    real_energy = energies.real[keep]
+    zpe_eV      = 0.5 * float(np.sum(real_energy[real_energy > 0]))
+
+    return freqs_cm, [modes[i] for i in keep], zpe_eV, vib
+
+
+def write_molden_file(atoms, freqs_cm, modes, log_path):
+    """Write Molden file with geometry and normal modes alongside the log,
+    using the same Eckart-projected frequencies/modes written to the log
+    (see compute_frequencies) so the two always agree exactly."""
     atobohr     = 1.889726
     molden_path = log_path.replace('.log', '.molden')
     symbols     = atoms.get_chemical_symbols()
     positions   = atoms.get_positions()
 
-    hessian_2d          = vib.get_vibrations().get_hessian_2d()
-    hessian_proj, n_rt   = _project_trans_rot(atoms, hessian_2d)
-    vib_data             = VibrationsData.from_2d(atoms, hessian_proj)
-    energies, modes      = vib_data.get_energies_and_modes()
-
-    freqs_cm = np.where(np.abs(energies.imag) > 1e-6,
-                         -energies.imag, energies.real) / invcm
-    order = np.argsort(np.abs(freqs_cm))
-    # drop the n_rt modes closest to zero (now cleanly the trans/rot ones),
-    # then order what's left with imaginary/most-negative first (molden convention)
-    keep = sorted(order[n_rt:], key=lambda i: freqs_cm[i])
-
     with open(molden_path, 'w') as f:
         f.write('[Molden Format]\n')
         f.write('[FREQ]\n')
-        for i in keep:
-            f.write(f'{freqs_cm[i]:6.1f}\n')
+        for f_cm in freqs_cm:
+            f.write(f'{f_cm:6.1f}\n')
         f.write('       \n')
         f.write('[FR-COORD]\n')
         for sym, pos in zip(symbols, positions):
             f.write(f'{sym} {pos[0]*atobohr:.6f} {pos[1]*atobohr:.6f} {pos[2]*atobohr:.6f}\n')
         f.write('\n')
         f.write('[FR-NORM-COORD]\n')
-        for vib_num, i in enumerate(keep, start=1):
+        for vib_num, mode in enumerate(modes, start=1):
             f.write(f'Vibration {vib_num}\n')
-            for disp in modes[i]:
+            for disp in mode:
                 f.write(f'{disp[0]*atobohr:.6f} {disp[1]*atobohr:.6f} {disp[2]*atobohr:.6f}\n')
 
 
-def write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV, converged):
+def write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV, converged,
+              terminated_normally=True):
     eV_to_Ha      = 1.0 / Hartree
     eV_to_kcalmol = mol / kcal
 
@@ -240,19 +450,16 @@ def write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV, c
         f.write("\n")
 
         f.write("VIBRATIONAL FREQUENCIES (cm^-1)\n")
-        for i, freq in enumerate(freqs):
-            # ASE returns complex numbers: imaginary modes have freq.imag > 0, freq.real ≈ 0
-            # Store imaginary modes as negative values (standard QC convention)
-            if hasattr(freq, 'imag') and freq.imag > 1e-3:
-                f_cm = -freq.imag
-            else:
-                f_cm = freq.real if hasattr(freq, 'real') else float(freq)
+        for i, f_cm in enumerate(freqs):
             f.write(f"{i+1:6d}  {f_cm:12.4f} cm**-1\n")
         f.write("\n")
 
         f.write(f"Zero point energy {zpe_kcal:.6f} kcal/mol\n")
         f.write(f"FINAL SINGLE POINT ENERGY   {energy_Ha:20.9f}\n\n")
-        f.write("AMK_TERMINATED_NORMALLY\n")
+        if terminated_normally:
+            f.write("AMK_TERMINATED_NORMALLY\n")
+        else:
+            f.write("AMK_FAILED: imaginary frequency persists after retries; not a true minimum\n")
 
 
 def write_irc_log(log_path, endpoint_xyz_path, model_name, direction, atoms, energy_eV,
@@ -351,10 +558,10 @@ def process_one(name, xyz_content, calc, calctype, model_name, charge=0, mult=1)
             else:
                 converged          = run_tsopt(atoms, name)
                 energy_eV          = atoms.get_potential_energy()
-                freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
-                write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
+                freqs_cm, modes, zpe_eV, vib = compute_frequencies(atoms, f"{name}_vib")
+                write_log(log_path, model_name, calctype, atoms, freqs_cm, zpe_eV, energy_eV,
                           converged)
-                write_molden_file(atoms, vib, log_path)
+                write_molden_file(atoms, freqs_cm, modes, log_path)
                 vib.clean()
 
         elif calctype == 'minopt':
@@ -363,12 +570,11 @@ def process_one(name, xyz_content, calc, calctype, model_name, charge=0, mult=1)
                 energy_eV = atoms.get_potential_energy()
                 write_log(log_path, model_name, calctype, atoms, [], 0.0, energy_eV, True)
             else:
-                converged          = run_minopt(atoms, name)
+                converged, freqs_cm, modes, zpe_eV, vib, is_true_min = run_minopt_verified(atoms, name)
                 energy_eV          = atoms.get_potential_energy()
-                freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
-                write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
-                          converged)
-                write_molden_file(atoms, vib, log_path)
+                write_log(log_path, model_name, calctype, atoms, freqs_cm, zpe_eV, energy_eV,
+                          converged, terminated_normally=is_true_min)
+                write_molden_file(atoms, freqs_cm, modes, log_path)
                 vib.clean()
 
         elif calctype in ('ircf', 'ircr'):
@@ -395,13 +601,38 @@ def process_one(name, xyz_content, calc, calctype, model_name, charge=0, mult=1)
         print(f"  {name}: ERROR - {e}", flush=True)
 
 
+def _cpu_worker_count():
+    """Number of CPU worker processes to use for MLIP batch calculations
+    when no GPU is available. Reuses the `runningtasks` value AutoMeKin's
+    shell scripts already export for this run (the same knob that controls
+    how many parallel ORCA/Gaussian/qcore jobs `doparallel` launches), so
+    no new keyword or CLI argument is needed. Falls back to 1 (current
+    sequential behavior) if unset, and never exceeds the CPU count."""
+    try:
+        n = int(os.environ.get('runningtasks', '1'))
+    except ValueError:
+        n = 1
+    ncpus = os.cpu_count() or 1
+    return max(1, min(n, ncpus))
+
+
 def _batch_worker(args):
-    """Worker function: processes a subset of entries on one GPU."""
+    """Worker function: processes a subset of entries on one GPU, or on CPU
+    (gpu_id=None) as one of several CPU worker processes."""
     gpu_id, rows, calctype, workdir, model_name, models_dir, charge, mult = args
-    # Set GPU visibility before any CUDA initialization
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
+    if gpu_id is not None:
+        # Set GPU visibility before any CUDA initialization
+        os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
+    else:
+        # Force this worker onto CPU even if CUDA is technically visible,
+        # and keep it single-threaded: parallelism here comes from running
+        # several worker *processes*, matching how `doparallel` runs several
+        # single-core ORCA/Gaussian jobs -- not from multi-threading one process.
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
+        torch.set_num_threads(1)
     calc = load_calculator(model_name, models_dir)
-    print(f"  [GPU {gpu_id}] model loaded, {len(rows)} entries", flush=True)
+    tag = f"GPU {gpu_id}" if gpu_id is not None else f"CPU worker (pid {os.getpid()})"
+    print(f"  [{tag}] model loaded, {len(rows)} entries", flush=True)
     old_cwd = os.getcwd()
     os.chdir(workdir)
     try:
@@ -415,7 +646,9 @@ def _batch_worker(args):
 
 
 def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
-    """Process all entries from inputs.db; distributes across all available GPUs."""
+    """Process all entries from inputs.db; distributes across all available
+    GPUs, or across `runningtasks` CPU worker processes if no GPU is
+    available and `runningtasks` > 1."""
     import multiprocessing as mp
 
     print(f"AMK_MLIP batch: {calctype} | model={model_name} | charge={charge} | mult={mult}",
@@ -428,7 +661,7 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
 
     ngpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
 
-    if ngpus <= 1:
+    if ngpus == 1:
         calc = load_calculator(model_name, models_dir)
         print(f"Model loaded on {get_device().upper()}", flush=True)
         old_cwd = os.getcwd()
@@ -441,7 +674,7 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
                 process_one(name, xyz_content, calc, entry_calctype, model_name, charge, mult)
         finally:
             os.chdir(old_cwd)
-    else:
+    elif ngpus >= 2:
         print(f"Using {ngpus} GPUs in parallel", flush=True)
         # Interleaved split for better load balancing
         chunks = [rows[i::ngpus] for i in range(ngpus)]
@@ -452,20 +685,53 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
         ctx = mp.get_context('spawn')
         with ctx.Pool(processes=ngpus) as pool:
             pool.map(_batch_worker, args_list)
+    else:
+        # No GPU: parallelize across CPU worker processes if `runningtasks` > 1
+        nworkers = _cpu_worker_count()
+        if nworkers > 1:
+            print(f"No GPU available -- using {nworkers} CPU worker processes "
+                  f"in parallel (from runningtasks)", flush=True)
+            chunks = [rows[i::nworkers] for i in range(nworkers)]
+            args_list = [
+                (None, chunks[i], calctype, workdir, model_name, models_dir, charge, mult)
+                for i in range(nworkers)
+            ]
+            ctx = mp.get_context('spawn')
+            with ctx.Pool(processes=nworkers) as pool:
+                pool.map(_batch_worker, args_list)
+        else:
+            calc = load_calculator(model_name, models_dir)
+            print(f"Model loaded on {get_device().upper()}", flush=True)
+            old_cwd = os.getcwd()
+            os.chdir(workdir)
+            try:
+                for name, xyz_content in rows:
+                    if xyz_content == 'salir':
+                        continue
+                    entry_calctype = _dispatch_calctype(name, calctype)
+                    process_one(name, xyz_content, calc, entry_calctype, model_name, charge, mult)
+            finally:
+                os.chdir(old_cwd)
 
     print("\nBatch complete.", flush=True)
 
 
-def run_single(calctype, xyzfile, model_name, models_dir, charge, mult):
-    """Single-structure mode."""
+def run_single(calctype, xyzfile, model_name, models_dir, charge, mult, calc=None):
+    """Single-structure mode. If calc is given (persistent-server reuse via
+    run_serve), skips loading the model and re-raises on error instead of
+    exiting the process -- the caller reports the failure over the response
+    fifo and keeps serving the next job."""
     name     = Path(xyzfile).stem
     log_path = f"{name}.log"
+    reuse    = calc is not None
 
-    print(f"AMK_MLIP: {calctype} | model={model_name} | charge={charge} | mult={mult}",
-          flush=True)
+    if not reuse:
+        print(f"AMK_MLIP: {calctype} | model={model_name} | charge={charge} | mult={mult}",
+              flush=True)
 
     try:
-        calc  = load_calculator(model_name, models_dir)
+        if calc is None:
+            calc = load_calculator(model_name, models_dir)
         atoms = read(xyzfile)
         atoms.info['charge'] = charge
         atoms.info['spin']   = mult
@@ -478,10 +744,10 @@ def run_single(calctype, xyzfile, model_name, models_dir, charge, mult):
             else:
                 converged          = run_tsopt(atoms, name)
                 energy_eV          = atoms.get_potential_energy()
-                freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
-                write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
+                freqs_cm, modes, zpe_eV, vib = compute_frequencies(atoms, f"{name}_vib")
+                write_log(log_path, model_name, calctype, atoms, freqs_cm, zpe_eV, energy_eV,
                           converged)
-                write_molden_file(atoms, vib, log_path)
+                write_molden_file(atoms, freqs_cm, modes, log_path)
                 vib.clean()
 
         elif calctype == 'minopt':
@@ -489,12 +755,11 @@ def run_single(calctype, xyzfile, model_name, models_dir, charge, mult):
                 energy_eV = atoms.get_potential_energy()
                 write_log(log_path, model_name, calctype, atoms, [], 0.0, energy_eV, True)
             else:
-                converged          = run_minopt(atoms, name)
+                converged, freqs_cm, modes, zpe_eV, vib, is_true_min = run_minopt_verified(atoms, name)
                 energy_eV          = atoms.get_potential_energy()
-                freqs, zpe_eV, vib = run_frequencies(atoms, f"{name}_vib")
-                write_log(log_path, model_name, calctype, atoms, freqs, zpe_eV, energy_eV,
-                          converged)
-                write_molden_file(atoms, vib, log_path)
+                write_log(log_path, model_name, calctype, atoms, freqs_cm, zpe_eV, energy_eV,
+                          converged, terminated_normally=is_true_min)
+                write_molden_file(atoms, freqs_cm, modes, log_path)
                 vib.clean()
 
         else:
@@ -510,7 +775,149 @@ def run_single(calctype, xyzfile, model_name, models_dir, charge, mult):
             f.write(f"AMK_ERROR: {e}\n")
             f.write(traceback.format_exc())
         print(f"ERROR: {e}", file=sys.stderr)
+        if reuse:
+            raise
         sys.exit(1)
+
+
+def run_md_single(xyzfile, model_name, models_dir, charge, mult, temp_K, duration_fs,
+                   timestep_fs=0.5, calc=None):
+    """Single reactive-MD trajectory. On failure, simply does not write
+    <name>_traj.xyz -- amk.sh already treats a missing trajectory file as
+    "this attempt produced nothing" for every other program too.
+
+    If calc is given (persistent-server reuse via run_serve), skips loading
+    the model and re-raises on error instead of exiting the process."""
+    name = Path(xyzfile).stem
+    reuse = calc is not None
+    print(f"AMK_MLIP: md | model={model_name} | T={temp_K} K | {duration_fs} fs", flush=True)
+    try:
+        if calc is None:
+            calc = load_calculator(model_name, models_dir)
+        atoms = read(xyzfile)
+        atoms.info['charge'] = charge
+        atoms.info['spin']   = mult
+        atoms.calc = calc
+        traj_path = run_md(atoms, name, temp_K, duration_fs, timestep_fs)
+        print(f"Done. Trajectory: {traj_path}", flush=True)
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        traceback.print_exc()
+        if reuse:
+            raise
+        sys.exit(1)
+
+
+def run_partial_opt_single(xyzfile, frozen_csv, model_name, models_dir, charge, mult, calc=None):
+    """Constrained relaxation seeding a subsequent TS search. On failure,
+    <name>_popt.xyz is simply not written.
+
+    If calc is given (persistent-server reuse via run_serve), skips loading
+    the model and re-raises on error instead of exiting the process."""
+    name = Path(xyzfile).stem
+    reuse = calc is not None
+    frozen_indices = [int(i) - 1 for i in frozen_csv.split(',') if i != '']
+    print(f"AMK_MLIP: partial_opt | model={model_name} | frozen(1-based)={frozen_csv}",
+          flush=True)
+    try:
+        if calc is None:
+            calc = load_calculator(model_name, models_dir)
+        atoms = read(xyzfile)
+        atoms.info['charge'] = charge
+        atoms.info['spin']   = mult
+        atoms.calc = calc
+        converged = run_partial_opt(atoms, name, frozen_indices)
+        popt_path = f"{name}_popt.xyz"
+        symbols   = atoms.get_chemical_symbols()
+        positions = atoms.get_positions()
+        with open(popt_path, 'w') as f:
+            f.write(f"{len(atoms)}\n\n")
+            for sym, pos in zip(symbols, positions):
+                f.write(f"{sym} {pos[0]:14.8f} {pos[1]:14.8f} {pos[2]:14.8f}\n")
+        print(f"Done. Converged: {converged}. Geometry: {popt_path}", flush=True)
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        traceback.print_exc()
+        if reuse:
+            raise
+        sys.exit(1)
+
+
+def run_dihedral_scan_single(xyzfile, dihedral_csv, dihed0, model_name, models_dir, charge,
+                              mult, npoints=36, step_deg=10.0):
+    """Relaxed torsional scan (see run_dihedral_scan). Writes tors.out in the
+    cwd; on failure tors.out is simply not written, same as qcore's branch
+    leaving no usable tors.out when entos.py fails outright."""
+    dihedral_indices = [int(i) - 1 for i in dihedral_csv.split(',')]
+    print(f"AMK_MLIP: dihedral_scan | model={model_name} | atoms(1-based)={dihedral_csv} | "
+          f"dihed0={dihed0}", flush=True)
+    try:
+        calc  = load_calculator(model_name, models_dir)
+        atoms = read(xyzfile)
+        atoms.info['charge'] = charge
+        atoms.info['spin']   = mult
+        atoms.calc = calc
+        run_dihedral_scan(atoms, dihedral_indices, dihed0, npoints=npoints, step_deg=step_deg)
+        print("Done. Scan: tors.out", flush=True)
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        traceback.print_exc()
+        sys.exit(1)
+
+
+def run_serve(req_fifo, resp_fifo, model_name, models_dir, charge, mult):
+    """Persistent worker for one amk.sh batch. Loading the UMA checkpoint
+    dominates the cost of every single mlip_calc.py call (~30s of a ~40s
+    call); amk.sh's trajectory loop makes many such calls (one MD run plus
+    one partial_opt+tsopt pair per bond-change event it detects), each
+    currently paying that cost again. This loads the model once and then
+    services one job at a time, read as a single line from req_fifo ("md
+    <xyzfile> <temp_K> <duration_fs> [timestep_fs]" / "partial_opt <xyzfile>
+    <frozen_csv>" / "tsopt|minopt <xyzfile>" -- the same tail already passed
+    on the command line for each mode), dispatching to the *_single functions
+    with the reused calculator. Writes DONE/ERROR <msg> to resp_fifo after
+    each job purely as a completion signal for the bash caller (mlip_request
+    in utils.sh) to block on; the existing output-file / AMK_TERMINATED_NORMALLY
+    checks in amk.sh are still what decides success, unchanged. Exits on a
+    QUIT line (or the request fifo's writer going away for good)."""
+    print(f"AMK_MLIP serve: loading {model_name}...", flush=True)
+    calc = load_calculator(model_name, models_dir)
+    print("AMK_MLIP serve: model loaded, ready for jobs", flush=True)
+
+    while True:
+        with open(req_fifo) as rf:
+            line = rf.readline().strip()
+        if not line or line == 'QUIT':
+            break
+
+        parts = line.split()
+        calctype, args = parts[0], parts[1:]
+        print(f"\n--- serve: {calctype} {' '.join(args)} ---", flush=True)
+        status = 'DONE'
+        try:
+            if calctype == 'md':
+                xyzfile, temp_K, duration_fs = args[0], float(args[1]), float(args[2])
+                timestep_fs = float(args[3]) if len(args) > 3 else 0.5
+                run_md_single(xyzfile, model_name, models_dir, charge, mult,
+                              temp_K, duration_fs, timestep_fs, calc=calc)
+            elif calctype == 'partial_opt':
+                xyzfile, frozen_csv = args[0], args[1]
+                if frozen_csv == 'NONE':
+                    frozen_csv = ''
+                run_partial_opt_single(xyzfile, frozen_csv, model_name, models_dir,
+                                       charge, mult, calc=calc)
+            elif calctype in ('tsopt', 'minopt'):
+                xyzfile = args[0]
+                run_single(calctype, xyzfile, model_name, models_dir, charge, mult, calc=calc)
+            else:
+                raise ValueError(f"serve: unknown calctype '{calctype}'")
+        except Exception as e:
+            status = f'ERROR: {e}'
+
+        with open(resp_fifo, 'w') as wf:
+            wf.write(status + '\n')
+
+    print("AMK_MLIP serve: exiting", flush=True)
 
 
 def main():
@@ -543,6 +950,61 @@ def main():
         charge     = int(sys.argv[5])
         mult       = int(sys.argv[6])
         run_single(calctype, xyzfile, model, models_dir, charge, mult)
+
+    elif mode == 'md':
+        if len(sys.argv) not in (9, 10):
+            print("Usage: mlip_calc.py md <xyzfile> <model> <models_dir> <charge> <mult> <temp_K> <duration_fs> [timestep_fs]")
+            sys.exit(1)
+        xyzfile     = sys.argv[2]
+        model       = sys.argv[3].lower()
+        models_dir  = sys.argv[4]
+        charge      = int(sys.argv[5])
+        mult        = int(sys.argv[6])
+        temp_K      = float(sys.argv[7])
+        duration_fs = float(sys.argv[8])
+        timestep_fs = float(sys.argv[9]) if len(sys.argv) > 9 else 0.5
+        run_md_single(xyzfile, model, models_dir, charge, mult, temp_K, duration_fs, timestep_fs)
+
+    elif mode == 'partial_opt':
+        if len(sys.argv) != 8:
+            print("Usage: mlip_calc.py partial_opt <xyzfile> <frozen_csv> <model> <models_dir> <charge> <mult>")
+            sys.exit(1)
+        xyzfile    = sys.argv[2]
+        frozen_csv = sys.argv[3]
+        model      = sys.argv[4].lower()
+        models_dir = sys.argv[5]
+        charge     = int(sys.argv[6])
+        mult       = int(sys.argv[7])
+        run_partial_opt_single(xyzfile, frozen_csv, model, models_dir, charge, mult)
+
+    elif mode == 'serve':
+        if len(sys.argv) != 8:
+            print("Usage: mlip_calc.py serve <req_fifo> <resp_fifo> <model> <models_dir> <charge> <mult>")
+            sys.exit(1)
+        req_fifo   = sys.argv[2]
+        resp_fifo  = sys.argv[3]
+        model      = sys.argv[4].lower()
+        models_dir = sys.argv[5]
+        charge     = int(sys.argv[6])
+        mult       = int(sys.argv[7])
+        run_serve(req_fifo, resp_fifo, model, models_dir, charge, mult)
+
+    elif mode == 'dihedral_scan':
+        if len(sys.argv) not in (9, 10, 11):
+            print("Usage: mlip_calc.py dihedral_scan <xyzfile> <a1,a2,a3,a4> <dihed0_deg> "
+                  "<model> <models_dir> <charge> <mult> [npoints] [step_deg]")
+            sys.exit(1)
+        xyzfile      = sys.argv[2]
+        dihedral_csv = sys.argv[3]
+        dihed0       = float(sys.argv[4])
+        model        = sys.argv[5].lower()
+        models_dir   = sys.argv[6]
+        charge       = int(sys.argv[7])
+        mult         = int(sys.argv[8])
+        npoints      = int(sys.argv[9]) if len(sys.argv) > 9 else 36
+        step_deg     = float(sys.argv[10]) if len(sys.argv) > 10 else 10.0
+        run_dihedral_scan_single(xyzfile, dihedral_csv, dihed0, model, models_dir, charge,
+                                  mult, npoints, step_deg)
 
     else:
         print(__doc__)

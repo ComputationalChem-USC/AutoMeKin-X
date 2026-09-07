@@ -78,7 +78,9 @@ if [ -f ${tsdirll}/MINs/min0.out ]; then
    echo "Calcs completed for min0"
 else
    name=min0_0
-   if [ "$program_opt" != "qcore" ]; then
+   if [ "$program_irc" = "mlip" ]; then
+      run_ll_mlip_min0
+   elif [ "$program_opt" != "qcore" ]; then
       echo "$min_template"                       > ${molecule}_freq.mop
       awk 'NR>2{print $0}' ${molecule}_ref.xyz  >> ${molecule}_freq.mop
       mopac ${molecule}_freq.mop 2>/dev/null
@@ -129,9 +131,12 @@ else
    sqlite3 ${tsdirll}/MINs/data.db "insert into data (name,datas) values ('$name','$datas');"
    sqlite3 ${tsdirll}/MINs/min.db "insert into min (natom,name,energy,zpe,g,geom,freq,sigma) values ($natom,'$name',$e0,$zpe0,$g_corr0,'$geom','$freq',$sigma);"
 fi
-# Now we do things specific of IRC 
+# Now we do things specific of IRC
 if [ ! -d "$tsdirll/IRC" ]; then mkdir $tsdirll/IRC ; fi
 if [ ! -d "$tsdirll/TSs" ]; then mkdir $tsdirll/TSs ; fi
+if [ "$program_irc" = "mlip" ]; then
+   run_ll_mlip_ts_irc
+else
 m=0
 sqlite3 ${tsdirll}/inputs.db "drop table if exists mopac; create table mopac (id INTEGER PRIMARY KEY,name TEXT, unique(name));"
 for name in $(awk '{print $3}' $tslistll)
@@ -221,5 +226,6 @@ if [ ! -z $SLURM_JOB_ID ] && [ ! -z $SLURM_NTASKS ]; then
   fi
 fi
    doparallel "runirc.sh {1} $tsdirll $program_opt" "$(seq $m)"
+fi
 fi
 

@@ -78,6 +78,10 @@ do
       echo $natom > tmp_geom
       echo "" >> tmp_geom
       get_geom_orca.sh $file >> tmp_geom
+   elif [ "$program_opt" = "mlip" ]; then
+      echo $natom > tmp_geom
+      echo "" >> tmp_geom
+      get_geom_mlip.sh $file >> tmp_geom
    else
       get_geom_mopac.sh $file > tmp_geom
    fi
@@ -103,6 +107,8 @@ do
       tmp_e=$(awk '/Energy=/{e0=$2};END{print e0}' $file)
    elif [ "$program_opt" = "orca" ]; then
       tmp_e=$(get_energy_orca_${LLcalc}.sh $file 1)
+   elif [ "$program_opt" = "mlip" ]; then
+      tmp_e=$(get_energy_mlip.sh $file)
    else
       tmp_e=$(awk '/HEAT OF FORMATION =/{e=$5};END{printf "%9.3f\n",e}' $file)
    fi

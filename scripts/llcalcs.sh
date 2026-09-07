@@ -190,7 +190,7 @@ while [ $iter -le $niter ]; do
    echo ""  
    ((iter=iter+1))
 done
-if [ "$program_opt" = "mopac" ] && [ "$barrierless" = "yes" ]; then
+if ([ "$program_opt" = "mopac" ] || [ "$program_opt" = "mlip" ]) && [ "$barrierless" = "yes" ]; then
    echo "Adding Barrierless reactions"
    start=$(date +%s.%N)
    locate_barrierless.sh  2> barrless.err 1> barrless.log

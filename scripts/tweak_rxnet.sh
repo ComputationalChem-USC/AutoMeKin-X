@@ -27,7 +27,7 @@ end=$(date +%s.%N)
 tt=$( echo "$end - $start" | bc -l | awk '{printf "%4.0f",$1}')
 echo "   time: $tt s"
 
-if [ "$program_opt" = "mopac" ] && [ "$barrierless" = "yes" ]; then
+if ([ "$program_opt" = "mopac" ] || [ "$program_opt" = "mlip" ]) && [ "$barrierless" = "yes" ]; then
    echo "   Adding Barrierless reactions"
    start=$(date +%s.%N)
    locate_barrierless.sh modify  2> barrless.err 1> barrless.log

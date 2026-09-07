@@ -1,7 +1,7 @@
 #!/bin/bash
 source utils.sh
 #On exit remove tmp files
-tmp_files=(ConnMat deg_bo deg* fort.* intern.dat intern.out intern* mingeom ScatMat ts_tors* ScalMat *_opt.* tors.* geomts_tors0 geomts_tors geom* tmp_gauss tmp* dihedrals tors_qcore.* ts.dat ts.xyz min.xyz freq.molden bond_order.txt bo.out bo.*)
+tmp_files=(ConnMat deg_bo deg* fort.* intern.dat intern.out intern* mingeom mingeom_tors.xyz ScatMat ts_tors* ScalMat *_opt.* tors.* geomts_tors0 geomts_tors geom* tmp_gauss tmp* dihedrals tors_qcore.* ts.dat ts.xyz min.xyz freq.molden bond_order.txt bo.out bo.* *_vib *_sella.log *.traj optstart_ref.* optstart_ref_*)
 trap 'err_report2 $LINENO $gauss_line' ERR
 trap cleanup EXIT INT
 
@@ -107,6 +107,8 @@ do
    if [ "$min" == "min0" ]; then
       if [ "$program_opt" = "qcore" ]; then
          awk '/Final structure/{flag=1; next} EOF{flag=0} flag' ${molecule}_freq.out >> mingeom
+      elif [ "$program_opt" = "mlip" ]; then
+         get_geom_mlip.sh ${molecule}_freq.out >> mingeom
       else
          get_geom_mopac.sh ${molecule}_freq.out | awk 'NF==4{print $0}' >> mingeom
       fi
@@ -201,8 +203,11 @@ do
                echo "$eopt"  >> tors.out
                printf "\n\n\n" >> tors.out
                awk 'NR>2{print $0}' min_opt.xyz >> tors.out
-            fi 
+            fi
          done
+      elif [ "$program_opt" = "mlip" ]; then
+         cp mingeom mingeom_tors.xyz
+         mlip_calc.py dihedral_scan mingeom_tors.xyz "$labels" $dihed0 $ll_mlip_model $models_dir $charge $mult
       else
          internlastatom="$(awk '{print $1,$2,$3,$4," 0 ",$6,$7,'$l1','$l2','$l3'}' intern.out)"
          sed 's/method/'"$method"' charge='$charge'/g' $sharedir/path_template >tors.mop
@@ -232,6 +237,7 @@ do
          awk 'BEGIN{nr0='$natom'*('$inmax'-1)+1;nrf='$natom'*'$inmax'};{if(NR>=nr0 && NR<=nrf) print $0}' geomts_tors0 >geomts_tors
          name="ts_tors"$itor
          fileden=${name}.den
+         filemolden=${name}.molden
          if [ "$program_opt" = "mopac" ]; then
             geom_TS="$(awk '$7="+1"' geomts_tors)"
             name_TS_inp=${name}
@@ -263,6 +269,21 @@ do
                printf "     Pt%2s: failed-->EF algorithm was unable to optimize a TS\n" $inmax
   	       continue    
             fi
+         elif [ "$program_opt" = "mlip" ]; then
+            cand=${name}_${inmax}
+            echo $natom > ${cand}.xyz
+            echo ""     >> ${cand}.xyz
+            cat geomts_tors >> ${cand}.xyz
+            mlip_calc.py tsopt ${cand}.xyz $ll_mlip_model $models_dir $charge $mult
+            if [ ! -f ${cand}.log ] || ! grep -q AMK_TERMINATED_NORMALLY ${cand}.log; then
+               printf "     Pt%2s: failed-->EF algorithm was unable to optimize a TS\n" $inmax
+               rm -f ${cand}.xyz ${cand}.log
+               continue
+            fi
+            mv ${cand}.log ${name}.out
+            if [ -f ${cand}.molden ]; then mv ${cand}.molden ${filemolden} ; fi
+            rm -f ${cand}.xyz
+            file=${name}.out
          elif [ "$program_opt" = "qcore" ]; then
             echo $natom > ts.xyz
             echo ""     >> ts.xyz
@@ -314,6 +335,7 @@ do
                   printf "     Pt%2s: TS optimized and added to ts list\n" $inmax
                   if [ "$program_opt" = "qcore" ]; then mv freq.molden $tsdirll/${name}.molden ; fi
                   if [ "$program_opt" = "mopac" ]; then get_NM_mopac.sh $tsdirll/${name}.out $tsdirll/${name} ; fi
+                  if [ -f ${filemolden} ]; then cp ${filemolden} ${tsdirll}/${name}.molden ; fi
                else
                   printf "     Pt%2s: TS optimized but not added-->redundant with ts %4s\n" $inmax $ok
                fi
@@ -326,6 +348,7 @@ do
                printf "     Pt%2s: TS optimized and added to ts list\n" $inmax
                if [ "$program_opt" = "qcore" ]; then mv freq.molden $tsdirll/${name}.molden ; fi
                if [ "$program_opt" = "mopac" ]; then get_NM_mopac.sh $tsdirll/${name}.out $tsdirll/${name} ; fi
+               if [ -f ${filemolden} ]; then cp ${filemolden} ${tsdirll}/${name}.molden ; fi
             fi
             ) 200>>${tslistll}.lock
          else

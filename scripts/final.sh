@@ -24,7 +24,7 @@ nts=$(wc -l $tslistll | awk '{print $1}')
 if [ $nts -eq 0 ]; then
    echo AMK did not find TSs in this run
    echo Aborting
-q  exit 
+   exit
 fi
 ###
 if [ $rate -eq 0 ]; then
@@ -218,7 +218,11 @@ do
     f="$(basename $file .rxyz)"
     ((n=n+1)) 
     number="$(printf %04d ${n%})"
-    if [ "$program_opt" = "mopac" ]; then
+    if [ "$program_irc" = "mlip" ]; then
+       if [ -f ${tsdirll}/TSs/${f}.molden ]; then
+          cp ${tsdirll}/TSs/${f}.molden $mdir/TS${number}.molden
+       fi
+    elif [ "$program_opt" = "mopac" ]; then
        get_NM_mopac.sh ${tsdirll}/${f}.out  $mdir/TS$number
        geom="$(awk 'BEGIN{atob=1.889726};/FR-COORD/{for(i=1;i<='$natom';i++){getline;print $1,$2/atob,$3/atob,$4/atob} }' ${mdir}/TS${number}.molden)"
        sqlite3 ${final}/ts.db "update ts set geom='$geom' where id='$n';"
@@ -240,7 +244,11 @@ do
     ((n=n+1)) 
     number="$(printf %04d ${n%})"
     if [ "$f" == "min0" ]; then
-       if [ "$program_opt" != "qcore" ]; then
+       if [ "$program_irc" = "mlip" ]; then
+          if [ -f ${tsdirll}/MINs/min0.molden ]; then
+             cp ${tsdirll}/MINs/min0.molden $mdir/MIN${number}.molden
+          fi
+       elif [ "$program_opt" != "qcore" ]; then
           get_NM_mopac.sh ${tsdirll}/MINs/${f}.out  $mdir/MIN$number
           geom="$(awk 'BEGIN{atob=1.889726};/FR-COORD/{for(i=1;i<='$natom';i++){getline;print $1,$2/atob,$3/atob,$4/atob} }' ${mdir}/MIN${number}.molden)"
           sqlite3 ${final}/min.db "update min set geom='$geom' where id='$n';"
@@ -248,7 +256,13 @@ do
           cp ${tsdirll}/MINs/min0.molden $mdir/MIN${number}.molden
        fi
     else
-       if [ "$program_opt" != "qcore" ]; then
+       if [ "$program_irc" = "mlip" ]; then
+          if [ -f ${tsdirll}/IRC/${f}.molden ]; then
+             cp ${tsdirll}/IRC/${f}.molden $mdir/MIN${number}.molden
+          else
+             echo Vibrational modes for MIN${number} could not be computed
+          fi
+       elif [ "$program_opt" != "qcore" ]; then
           get_NM_mopac.sh ${tsdirll}/IRC/${f}.out   $mdir/MIN$number
           geom="$(awk 'BEGIN{atob=1.889726};/FR-COORD/{for(i=1;i<='$natom';i++){getline;print $1,$2/atob,$3/atob,$4/atob} }' ${mdir}/MIN${number}.molden)"
           sqlite3 ${final}/min.db "update min set geom='$geom' where id='$n';"

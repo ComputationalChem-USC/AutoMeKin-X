@@ -28,16 +28,19 @@ fi
 read_input
 ###
 
+if [ "$program_irc" = "mlip" ]; then
+   run_ll_mlip_minfr
+else
 m=0
 sqlite3 ${tsdirll}/IRC/inputs.db "drop table if exists mopac; create table mopac (id INTEGER PRIMARY KEY,name TEXT, unique(name));"
 for name in $(ls $tsdirll/TSs/*_thermo.out | sed 's/_thermo.out//g' | sed 's/\// /g' | awk '{print $NF}')
 do
-  echo $name 
+  echo $name
   if [ -f ${tsdirll}/IRC/minf_${name}.out ] && [ -f ${tsdirll}/IRC/minr_${name}.out ]; then
      calc1=$(awk 'BEGIN{calc=1};/DONE ==/{calc=0};END{print calc}' ${tsdirll}/IRC/minf_${name}.out)
      calc2=$(awk 'BEGIN{calc=1};/DONE ==/{calc=0};END{print calc}' ${tsdirll}/IRC/minr_${name}.out)
      if [ $calc1 -eq 0 ] && [ $calc2 -eq 0 ]; then
-        calc=0 
+        calc=0
      else
         calc=1
      fi
@@ -49,7 +52,7 @@ do
     echo "Calcs completed for" $name
   else
      ((m=m+1))
-     getminfminr.sh $name 
+     getminfminr.sh $name
      echo -e "insert or ignore into mopac values (NULL,'$name');\n.quit" | sqlite3 ${tsdirll}/IRC/inputs.db
   fi
 done
@@ -58,9 +61,10 @@ echo Performing a total of $m min calculations
 if [ $m -gt 0 ]; then
 #ft2 slurm
 if [ ! -z $SLURM_JOB_ID ] && [ ! -z $SLURM_NTASKS ]; then
-  if (( $m < $SLURM_NTASKS )); then 
+  if (( $m < $SLURM_NTASKS )); then
     echo "WARNING: Number of min calculations ($m) lower than allocated tasks ($SLURM_NTASKS)."
   fi
 fi
    doparallel "runmin.sh {1} $tsdirll $program_opt" "$(seq $m)"
+fi
 fi
