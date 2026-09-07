@@ -9,10 +9,10 @@ trap cleanup EXIT INT
 cwd=$PWD
 sharedir=${AMK}/share
 exe=$(basename $0)
-if [ $# -eq 0 ]; then usages "One argument is required" ; fi
-inputfile=$1
 # Printing the references of the method
 print_ref
+if [ $# -eq 0 ]; then usages "One argument is required" ; fi
+inputfile=$1
 ##Define input file and create symbolic link-->amk.dat
 define_inputfile
 ###Reading stuff from inputfile
