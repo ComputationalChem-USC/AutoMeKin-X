@@ -13,8 +13,6 @@ nav_external_links:
     url: https://rxnkin.usc.es/amk/
   - title: Open in Colab
     url: https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb
-  - title: Get it from sylabs
-    url: https://cloud.sylabs.io/library/emartineznunez/default/automekin
 
 # Back to top link
 back_to_top: true

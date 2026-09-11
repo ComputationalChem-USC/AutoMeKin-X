@@ -168,7 +168,7 @@ HL methods (each lives in its own folder, so using the same filename
 for both doesn't clash).
 
 <p align="center">
-   <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/network.png" alt="Reaction network generated from RXNet.rel with UMA-refined results" width="700">
+   <img src="{{ "/assets/images/beginners_tutorial/network.png" | relative_url }}" alt="Reaction network generated from RXNet.rel with UMA-refined results" width="700">
 </p>
 
 This is the network generated from `RXNet.rel` with the results
@@ -177,7 +177,7 @@ each edge is a transition state connecting them, positioned relative
 to the global minimum's energy.
 
 <p align="center">
-   <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/PLOT.png" alt="Energy profile of the reaction network" width="600">
+   <img src="{{ "/assets/images/beginners_tutorial/PLOT.png" | relative_url }}" alt="Energy profile of the reaction network" width="600">
 </p>
 
 The generated HTML file also includes an energy profile of the

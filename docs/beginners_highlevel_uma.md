@@ -56,12 +56,11 @@ Nothing else needs to change — `HL_rxn_network`, `IRCpoints`,
 stay the same.
 
 {: .note }
-One real MLIP-specific constraint: `--Kinetics--` must use `Energy
-<value>`, not `Temperature`, because MLIP models don't compute the
-Gibbs free-energy correction needed to sort by Boltzmann weighting at
-a given temperature — with `Energy`, AutoMeKin sorts using E+ZPE
-instead. The example `amk.dat` already uses `Energy 150`, so no change
-is needed there.
+One real MLIP-specific constraint: `--Kinetics--` must use `Energy <value>`,
+not `Temperature`, because MLIP models don't compute the Gibbs free-energy
+correction needed to sort by Boltzmann weighting at a given temperature —
+with `Energy`, AutoMeKin sorts using E+ZPE instead. The example `amk.dat`
+already uses `Energy 150`, so no change is needed there.
 
 ## Launching the calculation <a name="launch"></a>
 

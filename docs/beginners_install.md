@@ -302,7 +302,7 @@ where amk.dat is the inputfile
 ```
 
 <p align="center">
-   <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/banner.png" alt="AutoMeKin ASCII logo banner" width="700">
+   <img src="{{ "/assets/images/beginners_tutorial/banner.png" | relative_url }}" alt="AutoMeKin ASCII logo banner" width="700">
 </p>
 
 This message **confirms the installation worked**: the program runs,
@@ -366,13 +366,13 @@ license.
 - Register at <https://orcaforum.kofo.mpg.de/index.php?register/>.
 
   <p align="center">
-     <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/register_orca.png" alt="ORCA forum registration page" width="700">
+     <img src="{{ "/assets/images/beginners_tutorial/register_orca.png" | relative_url }}" alt="ORCA forum registration page" width="700">
   </p>
 
 - Confirm the email and accept the EULA (license agreement).
 
   <p align="center">
-     <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/agreement.png" alt="ORCA EULA agreement" width="700">
+     <img src="{{ "/assets/images/beginners_tutorial/agreement.png" | relative_url }}" alt="ORCA EULA agreement" width="700">
   </p>
 
 - Log in and go to the *Filebase* section. Choose the **Linux x86-64**
@@ -381,7 +381,7 @@ license.
   used), and download the `.tar.xz` archive.
 
   <p align="center">
-     <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/download.png" alt="ORCA Filebase download section" width="700">
+     <img src="{{ "/assets/images/beginners_tutorial/download.png" | relative_url }}" alt="ORCA Filebase download section" width="700">
   </p>
 
 **2. Install OpenMPI 4.1 (a required ORCA dependency)**
@@ -508,7 +508,7 @@ The `uma-m-1p1.pt` model (~11 GB) is hosted on Hugging Face and
 - Create an account at <https://huggingface.co/join> if needed.
 
   <p align="center">
-     <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/Hugging_face_login.png" alt="Hugging Face login page" width="700">
+     <img src="{{ "/assets/images/beginners_tutorial/Hugging_face_login.png" | relative_url }}" alt="Hugging Face login page" width="700">
   </p>
 
 - Go to <https://huggingface.co/facebook/UMA> and accept the "FAIR
@@ -516,7 +516,7 @@ The `uma-m-1p1.pt` model (~11 GB) is hosted on Hugging Face and
   birth, and organization).
 
   <p align="center">
-     <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/license_agreement.png" alt="FAIR Chemistry License agreement" width="700">
+     <img src="{{ "/assets/images/beginners_tutorial/license_agreement.png" | relative_url }}" alt="FAIR Chemistry License agreement" width="700">
   </p>
 
   {: .note }
@@ -524,7 +524,7 @@ The `uma-m-1p1.pt` model (~11 GB) is hosted on Hugging Face and
   an email granting access to the UMA models arrives, like this one:
 
   <p align="center">
-     <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/acceso.png" alt="UMA access approval email" width="700">
+     <img src="{{ "/assets/images/beginners_tutorial/acceso.png" | relative_url }}" alt="UMA access approval email" width="700">
   </p>
 
 - Generate an access token at
@@ -532,7 +532,7 @@ The `uma-m-1p1.pt` model (~11 GB) is hosted on Hugging Face and
   enough).
 
   <p align="center">
-     <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/token.png" alt="Hugging Face access token generation" width="700">
+     <img src="{{ "/assets/images/beginners_tutorial/token.png" | relative_url }}" alt="Hugging Face access token generation" width="700">
   </p>
 
 Once the account is approved, install the client and authenticate:
@@ -544,7 +544,7 @@ hf auth login
 ```
 
 <p align="center">
-   <img src="https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/gh-pages/assets/images/beginners_tutorial/hf_login.png" alt="Hugging Face CLI login" width="700">
+   <img src="{{ "/assets/images/beginners_tutorial/hf_login.png" | relative_url }}" alt="Hugging Face CLI login" width="700">
 </p>
 
 Download the model, then move it out of the `checkpoints/` subfolder

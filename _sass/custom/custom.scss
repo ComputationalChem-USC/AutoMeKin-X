@@ -4,12 +4,25 @@ body {
   background-color: #eef2ff;
 }
 
-// Background image filling the bottom of the left sidebar (nav headings/links), uncropped
-.side-bar {
-  background-image: url("/AutoMeKin-X/assets/images/background.png");
+// Height reserved for the decorative sidebar footer image, kept in one
+// place so the nav padding below always matches the footer's own size.
+$sidebar-footer-height: 130px;
+
+// Background image lives only in the footer strip (fixed height, always
+// pinned to the bottom of the sidebar) so it can never sit under nav text,
+// even when nav categories are expanded and the link list scrolls.
+.site-footer {
+  min-height: $sidebar-footer-height;
+  background-image: url("#{$baseurl}/assets/images/background.png");
   background-repeat: no-repeat;
   background-position: bottom center;
   background-size: contain;
+}
+
+// Reserve the same height at the bottom of the scrollable nav list so its
+// content never scrolls underneath the footer/background image.
+.site-nav {
+  padding-bottom: $sidebar-footer-height;
 }
 
 // Dynamic animated gradient header bar (no logo image, just the site title)
@@ -20,16 +33,63 @@ body {
 }
 
 .site-header {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(120deg, #4338ca, #4f46e5, #6366f1, #4f46e5, #4338ca);
   background-size: 300% 300%;
-  animation: headerGradientShift 10s ease infinite;
+  animation: headerGradientShift 8s ease infinite;
   border-bottom: none;
+  box-shadow: 0 2px 16px rgba(67, 56, 202, 0.28);
   color: #fff;
+}
+
+// A soft light sweep that glides across the header on a loop, on top of
+// the animated gradient, for a bit of extra motion/depth.
+@keyframes headerShimmer {
+  0% { transform: translateX(-60%); }
+  100% { transform: translateX(160%); }
+}
+
+.site-header::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 50%;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.28) 50%, transparent 80%);
+  animation: headerShimmer 6s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .site-title,
 .site-title:hover {
   color: #fff !important;
+  background-image: none !important;
+}
+
+.site-title {
+  position: relative;
+  z-index: 1;
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.site-title:hover {
+  transform: translateY(-1px);
+}
+
+// Keep the mobile menu button above the shimmer and visible on the gradient
+.site-header .site-button {
+  position: relative;
+  z-index: 1;
+}
+
+.site-header .icon {
+  color: #fff;
 }
 
 .main-content h1,
@@ -132,6 +192,62 @@ body {
   font-size: 1rem;
 }
 
+// Modernized top bar: sticky glass header behind the search box and
+// repository link, so it stays visible while scrolling long doc pages.
+.main-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(79, 70, 229, 0.12) !important;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+}
+
+// Floating rounded search pill instead of the theme's flat, edge-to-edge input
+.search-input-wrap {
+  border-radius: 999px !important;
+}
+
+.search-input {
+  transition: background-color 0.15s ease;
+}
+
+@media (min-width: 50rem) {
+  .search-input-wrap {
+    top: 0.6rem !important;
+    bottom: 0.6rem !important;
+    height: auto !important;
+    border: 1px solid rgba(79, 70, 229, 0.18);
+    box-shadow: none !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .search-input {
+    background-color: #f8fafc !important;
+    border-radius: 999px;
+  }
+
+  .search:focus-within .search-input-wrap {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.14) !important;
+  }
+
+  .search:focus-within .search-input {
+    background-color: #fff !important;
+  }
+}
+
+.search-icon {
+  color: #6366f1;
+  transition: color 0.15s ease;
+}
+
+.search-input:focus + .search-label .search-icon {
+  color: #4338ca !important;
+}
+
 // Repository button in the auxiliary nav
 .aux-nav .site-button {
   background-color: #4f46e5;
@@ -139,12 +255,14 @@ body {
   border-radius: 999px;
   padding: 0.4rem 1.1rem;
   font-weight: 600;
-  transition: background-color 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .aux-nav .site-button:hover {
   background-color: #4338ca;
   transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(67, 56, 202, 0.35);
 }
 
 .aux-nav .site-button svg {
