@@ -104,7 +104,7 @@ This just prints `OK` or `MISSING` for each one — nothing gets changed:
 
 ```bash
 for pkg in git curl build-essential gfortran autoconf automake gawk bc \
-           environment-modules parallel sqlite3 libsqlite3-dev; do
+           parallel sqlite3 libsqlite3-dev; do
   dpkg -s "$pkg" &>/dev/null && echo "OK      $pkg" || echo "MISSING $pkg"
 done
 ```
@@ -119,7 +119,6 @@ sudo apt install -y \
   build-essential gfortran \
   autoconf automake \
   gawk bc \
-  environment-modules \
   parallel \
   sqlite3 libsqlite3-dev
 ```
@@ -132,7 +131,6 @@ sudo apt install -y \
 | `build-essential`, `gfortran` | C/C++ and Fortran compilers (AutoMeKin has code in both languages) |
 | `autoconf`, `automake` | Generate the `configure` script from the source code |
 | `gawk`, `bc` | Text and calculation utilities used by internal scripts |
-| `environment-modules` | Lets you load/unload AutoMeKin as a "module" (optional but recommended) |
 | `parallel` | Runs several calculations in parallel (speeds up simulations) |
 | `sqlite3`, `libsqlite3-dev` | Database where AutoMeKin stores intermediate results |
 
@@ -247,7 +245,6 @@ terminal, add the following to the end of `~/.bashrc`:
 
 ```bash
 # --- AutoMeKin ---
-module use $HOME/automekin/install/modules
 export AMK=$HOME/automekin/install
 export PATH=$AMK/bin:$AMK/bin/HLscripts:$AMK/bin/MOPAC_DEV:$PATH
 export LIBRARY_PATH=$AMK/lib:$AMK/bin/MOPAC_DEV
@@ -261,7 +258,6 @@ file):
 cat >> ~/.bashrc << 'EOF'
 
 # --- AutoMeKin ---
-module use $HOME/automekin/install/modules
 export AMK=$HOME/automekin/install
 export PATH=$AMK/bin:$AMK/bin/HLscripts:$AMK/bin/MOPAC_DEV:$PATH
 export LIBRARY_PATH=$AMK/lib:$AMK/bin/MOPAC_DEV
