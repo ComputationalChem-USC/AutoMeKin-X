@@ -8,6 +8,12 @@ has_children: true
 
 # Complete tutorial for beginners
 
+<p align="center">
+  <a class="pdf-download-button" href="{{ "/assets/files/AutoMeKin-Beginners-Tutorial.pdf" | relative_url }}" download>
+    📥 Download this tutorial as a PDF
+  </a>
+</p>
+
 This appendix is a from-zero, step-by-step walkthrough aimed at people
 who are **not yet familiar with AutoMeKin or computational chemistry**.
 It complements the rest of the Tutorial section above (which assumes

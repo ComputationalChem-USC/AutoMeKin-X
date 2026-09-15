@@ -270,6 +270,26 @@ $sidebar-footer-height: 130px;
   stroke: #fff;
 }
 
+// PDF download button (e.g. "Complete tutorial for beginners")
+.pdf-download-button {
+  display: inline-block;
+  background-color: #4f46e5;
+  color: #fff !important;
+  border-radius: 999px;
+  padding: 0.65rem 1.5rem;
+  font-weight: 600;
+  font-size: 1.05rem;
+  text-decoration: none !important;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pdf-download-button:hover {
+  background-color: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(67, 56, 202, 0.4);
+}
+
 // Homepage feature card grid
 .feature-grid {
   display: grid;
