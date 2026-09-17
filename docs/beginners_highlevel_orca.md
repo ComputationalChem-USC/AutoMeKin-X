@@ -183,7 +183,7 @@ gets trapped in the MIN 3 isomer.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `orca does not seem to be installed` / `Aborting...` | ORCA isn't on the `PATH` of the session launching the calculation | Check the [installation page](beginners_install.html), section 7.2; confirm with a bare `orca` that it prints the banner |
+| `orca does not seem to be installed` / `Aborting...` | ORCA isn't on the `PATH` of the session launching the calculation | Check the [installation page](beginners_install.html), section 7.2; confirm with a bare `orca` that it responds with its "requires the name of a parameterfile" message |
 | `Keyword HL_rxn_network has not been specified` | That line is missing from the `.dat` | Add `HL_rxn_network complete` (or `reduced N`) under `--General--` |
 | Fewer TSs in `FINAL_HL` than in `FINAL_LL` | Normal: some LL TSs don't converge to a real saddle point at HL, or exceed the `Energy` threshold from `--Kinetics--` | Not an error — check `tsdirHL_<molecule>/TSs/` for the detail on each one |
 | The calculation takes much longer than LL | Expected: DFT with ORCA is orders of magnitude more expensive than PM7 | Tune `runningtasks` to the available cores; be patient — in this example (13 TSs, 5-atom molecule) it took ~2 hours |

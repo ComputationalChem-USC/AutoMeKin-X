@@ -420,13 +420,21 @@ number.)
 orca
 ```
 
-This should print the ORCA banner. If `orca: command not found`
-appears instead, check that the PATH entry points to the folder that
-actually contains the `orca` executable. Depending on the ORCA
-version, this may or may not be inside a `bin/` subfolder — some
-versions install the executable directly in the extracted folder, in
-which case the PATH entry should point there instead, e.g.
-`export PATH="$HOME/orca6/orca6:$PATH"`.
+This should print:
+
+```
+This program requires the name of a parameterfile as argument
+For example ORCA TEST.INP
+```
+
+This confirms ORCA is installed and found on the `PATH`: it's only
+complaining that no input file was given (expected, since none was
+passed). If `orca: command not found` appears instead, check that the
+PATH entry points to the folder that actually contains the `orca`
+executable. Depending on the ORCA version, this may or may not be
+inside a `bin/` subfolder — some versions install the executable
+directly in the extracted folder, in which case the PATH entry should
+point there instead, e.g. `export PATH="$HOME/orca6/orca6:$PATH"`.
 
 ### 7.3 Machine-learning interatomic potentials (MLIP): MACE and UMA <a name="73-mlip"></a>
 
