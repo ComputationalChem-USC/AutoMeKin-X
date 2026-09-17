@@ -1324,6 +1324,7 @@ function g09_input {
       echo -e "insert or ignore into gaussian values (NULL,'ircf_$i','$inp_hlf');\n.quit" | sqlite3 ${tsdirhl}/IRC/inputs.db
       ((m=m+1))
       echo -e "insert or ignore into gaussian values (NULL,'ircr_$i','$inp_hlr');\n.quit" | sqlite3 ${tsdirhl}/IRC/inputs.db
+      ((m=m+1))
    elif [ "$calc" = "min_irc" ]; then
       if [ -f $tsdirhl"/IRC/"$chkfilef".chk" ]; then
          calmf="$(sed 's@Mem@'$mem'@;s@pseudo@'$pseudo'@;s/ts,noeigentest,//;s/tkmc/'$temperature'/;s@level1@'$level1' pop=(mk,nbo) guess=read@;s/charge/'$charge'/;s/mult/'$mult'/;s@iop@'"$iop"'@' $sharedir/hl_input_template)"
