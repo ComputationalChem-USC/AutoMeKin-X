@@ -158,14 +158,35 @@ which avoids activation of base environment.
 ```bash
 conda create -n qcore-0.8.14-env -c entos -c conda-forge qcore==0.8.14 'tbb<2021'
 ```
-4. Activate the newly created environment:
+4. Activate the newly created environment and, since each user will be asked to read the
+Software License Agreement to generate a unique token, do so now:
 ```bash
 conda activate qcore-0.8.14-env
-```
-5. After installation, each user will be asked to read the Software License Agreement to generate a unique token:
-```bash
 qcore --academic-license
+conda deactivate
 ```
+
+{: .important }
+**Don't leave `qcore-0.8.14-env` activated when you actually run AutoMeKin.**
+`conda activate` puts that environment's own Python (and its `tbb`/`mkl` build) ahead of
+everything else on your `PATH`. If it's still active when you launch `amk.sh`/`hlcalcs.sh`,
+it will shadow the Python your AutoMeKin environment needs (`ase`, `numpy`, etc.), which can
+break scripts like `createMat.py` with confusing import errors that have nothing to do with
+qcore itself.
+
+5. Instead, make `qcore` reachable from your normal AutoMeKin environment with a small
+wrapper script, placed on its `PATH` next to the other AutoMeKin executables (e.g. in
+`$AMK/bin`):
+```bash
+cat > $AMK/bin/qcore << 'EOF'
+#!/bin/bash
+exec /path/to/miniconda3/envs/qcore-0.8.14-env/bin/qcore "$@"
+EOF
+chmod +x $AMK/bin/qcore
+```
+Replace `/path/to/miniconda3` with wherever miniconda was installed. From then on, `qcore`
+behaves like a normal command in your AutoMeKin environment (`HighLevel qcore ...` in your
+input file works as expected) without ever activating `qcore-0.8.14-env` again.
 
 ### Installing `amk_tools`
 
