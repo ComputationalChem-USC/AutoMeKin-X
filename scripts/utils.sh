@@ -399,22 +399,22 @@ function read_input {
 #HL stuff
    program_hl="$(awk '{if($1=="HighLevel") print $2}' $inputfile)"
    if [ -z "$program_hl" ]; then
-      if [ $sampling -ne 30 ]; then
-         echo HighLevel keyword has not been defined
-         exit 1
-      fi
-   ##############cambiando_esto##########################   
-   #elif [ "$program_hl" = "qcore" ]; then
-   #   HLstring0="qcore_template"
-   #elif [ "$program_hl" = "g09" ]; then
-   #   HLstring0="$(awk '{if($1=="HighLevel") print $3}' $inputfile)"
-   #elif [ "$program_hl" = "g16" ]; then
-   #   HLstring0="$(awk '{if($1=="HighLevel") print $3}' $inputfile)"
-   #else
-   #   echo HighLevel value is $program_hl , and it should be qcore ,g09 or g16
-   #   exit 1
-   #fi
-   ###################por_esto###########################
+      # HighLevel is only ever read downstream by the HL pipeline (every
+      # script under HLscripts/ -- confirmed none of the plain LL scripts
+      # reference $program_hl), so don't force the keyword on a pure LL run
+      # (llcalcs.sh and everything it calls). command -v resolves $0 through
+      # PATH even when invoked by bare name (e.g. hlcalcs.sh internally
+      # re-invoking irc.sh), so this still works for every re-entry point.
+      case "$(command -v "$0" 2>/dev/null)" in
+         */HLscripts/*)
+            if [ $sampling -ne 30 ]; then
+               echo HighLevel keyword has not been defined
+               exit 1
+            fi
+            ;;
+      esac
+   elif [ "$program_hl" = "qcore" ]; then
+      HLstring0="qcore_template"
    elif [ "$program_hl" = "g09" ]; then
       HLstring0="$(awk '{if($1=="HighLevel") print $3}' $inputfile)"
    elif [ "$program_hl" = "g16" ]; then
@@ -448,9 +448,6 @@ function read_input {
    # For ORCA and MLIP, always single job regardless of method string
    if [ "$program_hl" = "orca" ]; then noHLcalc=1; fi
    if [ "$program_hl" = "mlip" ]; then noHLcalc=1; fi
-   ###########cambiando_esto#####################
-   #IRCpoints=$(awk 'BEGIN{if("'$program_hl'"~/g[01][96]/)np=100;if("'$program_hl'"=="qcore")np=500};{if($1=="IRCpoints") np=$2};END{print np}' $inputfile)
-   #######################por_esto####################
    IRCpoints=$(awk 'BEGIN{if("'$program_hl'"~/g[01][96]/)np=100;if("'$program_hl'"=="qcore")np=500;if("'$program_hl'"=="orca")np=20;if("'$program_hl'"=="mlip")np=100};{if($1=="IRCpoints") np=$2};END{print np}' $inputfile)
    iop=$(awk '{if($1=="iop") {$1="";print $0}}' $inputfile)
    mem=$(awk 'BEGIN{mem=1};{if($1=="Memory") mem=$2};END{print mem}' $inputfile)
@@ -1403,6 +1400,7 @@ function qcore_input {
       naf=$(echo "$geo" | wc -l)
       printf "$naf\n\n$geo" > ${tsdirhl}/PRODs/CALC/${chkfile}.xyz
    elif [ "$calc" = "irc" ]; then
+      ((m=m+1))
       echo -e "insert or ignore into gaussian values (NULL,'$i',NULL);\n.quit" | sqlite3 ${tsdirhl}/IRC/inputs.db
       cp ${tsdirhl}/${i}_opt.xyz ${tsdirhl}/IRC/${i}_grad.xyz
       sed -e '/dft/ {' -e 'r qcore_template' -e 'd' -e '}' $sharedir/grad_hl | sed "s/carga/$charge/;s/tag/${i}_grad/"  > ${tsdirhl}/IRC/${i}_grad.dat

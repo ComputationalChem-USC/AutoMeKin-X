@@ -46,14 +46,12 @@ do
   else
     ((n=n+2))
     echo "Submit Mins opt calc for" $i
-    if [ "$program_hl" = "g09" ] || [ "$program_hl" = "g16" ]; then
+    if [ "$program_hl" = "g09" ] || [ "$program_hl" = "g16" ] || [ "$program_hl" = "qcore" ]; then
        get_minfminr_g09.sh $i
     elif [ "$program_hl" = "orca" ]; then
        get_minfminr_orca.sh $i
     elif [ "$program_hl" = "mlip" ]; then
        get_minfminr_mlip.sh $i
-    else
-       get_minfminr_${program_hl}.sh $i
     fi
   fi
 done
