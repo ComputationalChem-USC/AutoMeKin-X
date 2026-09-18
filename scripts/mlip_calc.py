@@ -15,10 +15,12 @@ Name-based calctype dispatch in batch mode:
   ts*   → tsopt (or whatever calctype is given on the command line)
 
 LL reactive-sampling modes (used by amk.sh when LowLevel is mlip):
-  mlip_calc.py md <xyzfile> <model> <models_dir> <charge> <mult> <temp_K> <duration_fs> [timestep_fs]
+  mlip_calc.py md <xyzfile> <model> <models_dir> <charge> <mult> <temp_K> <duration_fs> [timestep_fs] [mdc]
       NVE trajectory from Maxwell-Boltzmann initial velocities at temp_K,
       written as a plain multi-frame XYZ (<name>_traj.xyz, ~1 frame/fs) so it
       can be piped through snapshots_mopac.sh into bbfs.exe unchanged.
+      mdc>=1 (bond-break/form-constrained MD) skips the H dynamical-mass
+      override, matching AMK's mopac branch.
 
   mlip_calc.py partial_opt <xyzfile> <frozen_csv> <model> <models_dir> <charge> <mult>
       Relaxes every atom NOT listed in <frozen_csv> (comma-separated, 1-based,
@@ -202,12 +204,21 @@ def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
           flush=True)
     dyn = _IRC(atoms, trajectory=f'{name}.traj', dx=dx, eta=eta, gamma=gamma,
                keep_going=True)
-    converged = dyn.run(fmax=fmax, steps=steps, direction=direction)
+    # Sella warns whenever the inner loop misses on any single outer step,
+    # even if the walk (keep_going=True) later still reaches the final
+    # convergence check successfully -- confirmed on the FA 5-iter validation
+    # run that every surviving ircf_/ircr_ log ended up Converged: True
+    # despite this warning firing 3 times. Silenced as log noise; the
+    # `converged` flag returned below is still recorded in the log by
+    # write_irc_log (as "Converged: ...") for anyone auditing results later.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="IRC inner loop failed to converge.*")
+        converged = dyn.run(fmax=fmax, steps=steps, direction=direction)
     print(f"  Steps: {dyn.nsteps}, Converged: {converged}", flush=True)
     return converged
 
 
-def run_md(atoms, name, temp_K, duration_fs, timestep_fs=0.5):
+def run_md(atoms, name, temp_K, duration_fs, timestep_fs=0.5, mdc=0):
     """NVE trajectory from Maxwell-Boltzmann initial velocities.
 
     Writes a plain multi-frame XYZ (element x y z, no extra columns) at
@@ -216,19 +227,33 @@ def run_md(atoms, name, temp_K, duration_fs, timestep_fs=0.5):
 
     The input geometry is already relaxed (opt_start/sel_mol.sh optimize it
     before amk.sh ever calls this), so at t=0 all of the assigned thermal
-    energy is kinetic and none is potential. Under NVE that energy
-    equilibrates between the two over the first several vibrational periods,
-    so the time-averaged temperature the trajectory actually samples ends up
-    well below temp_K -- roughly half, in the harmonic-oscillator limit
-    (virial theorem). FAIR's own UMA MD example initializes at 2x the target
-    temperature for exactly this reason; the same factor is used here so
-    temp_K (which callers set from amk.dat's `temp`) matches the intended
-    excitation instead of silently under-driving the reactive sampling."""
+    energy is kinetic and none is potential; under NVE that energy then
+    equilibrates between the two. EQUIPARTITION_FACTOR is kept at 1 (no
+    initial-temperature boost) to match AMK's MOPAC path, which samples
+    momenta directly at the target temperature (see termo.f90) rather than
+    compensating for the kinetic/potential equilibration up front."""
     from ase.md.velocitydistribution import MaxwellBoltzmannDistribution, Stationary, ZeroRotation
     from ase.md.verlet import VelocityVerlet
     from ase import units as ase_units
 
-    EQUIPARTITION_FACTOR = 2.0
+    # Give H its usual dynamical mass override (real mass ~1.008 amu -> 4.0),
+    # same as AMK's MOPAC path (amk.sh's `sed 's/H /H4.0/g'` on the .mop
+    # geometry block): H's fast, low-mass motion is what makes classical
+    # trajectories stiff, so slowing it down like this keeps the reactive
+    # sampling stable at the same timestep MOPAC uses. This only affects the
+    # velocities/dynamics below -- it does not change the written geometry.
+    # Skipped when mdc>=1 (bond-break/form-constrained MD, AMK's
+    # nbondsbreak/nbondsform), matching amk.sh's mopac branch (utils.sh:97-102)
+    # which keeps real H mass there so the constraint's physics isn't distorted.
+    if mdc < 1:
+        H_DYNAMICAL_MASS = 4.0
+        masses = atoms.get_masses().copy()
+        is_h = [sym == 'H' for sym in atoms.get_chemical_symbols()]
+        masses[is_h] = H_DYNAMICAL_MASS
+        atoms.set_masses(masses)
+        print("masses:", list(zip(atoms.get_chemical_symbols(), atoms.get_masses())), flush=True)
+
+    EQUIPARTITION_FACTOR = 1.0
     MaxwellBoltzmannDistribution(atoms, temperature_K=temp_K * EQUIPARTITION_FACTOR)
     Stationary(atoms)
     if len(atoms) > 2:
@@ -237,6 +262,26 @@ def run_md(atoms, name, temp_K, duration_fs, timestep_fs=0.5):
     dyn = VelocityVerlet(atoms, timestep=timestep_fs * ase_units.fs)
     dump_every = max(1, round(1.0 / timestep_fs))   # ~1 frame per fs
     nsteps = max(1, round(duration_fs / timestep_fs))
+
+    # Fragmentation stopping criterion, matching AMK's MOPAC path: stop the
+    # trajectory once any initially-bonded pair has stretched past 5x its
+    # starting distance, checked every 10 MD steps (not every step/frame).
+    # Initial bonds are perceived once, up front, from covalent radii (ASE's
+    # natural_cutoffs) -- this only decides which pairs to watch, it doesn't
+    # change the dynamics itself.
+    FRAGMENT_RATIO = 5.0
+    FRAGMENT_CHECK_EVERY = 10
+    from ase.neighborlist import natural_cutoffs, neighbor_list
+    # mult=1.2: the default (1.0, bare covalent-radii sum) misses some real
+    # equilibrium bonds by a hair (e.g. a typical C-H distance ~1.09 Ang vs a
+    # C+H covalent-radii-sum cutoff of ~1.07 Ang) -- 1.2 was verified to catch
+    # all 4 bonds in the formic-acid test geometry with no spurious ones.
+    i_idx, j_idx = neighbor_list('ij', atoms, natural_cutoffs(atoms, mult=1.2))
+    bonded_pairs = sorted({tuple(sorted((int(i), int(j)))) for i, j in zip(i_idx, j_idx)})
+    r0 = {pair: atoms.get_distance(*pair) for pair in bonded_pairs}
+    print(f"Fragmentation watch: {len(bonded_pairs)} initial bond(s), "
+          f"stop if r > {FRAGMENT_RATIO}x r0, checked every {FRAGMENT_CHECK_EVERY} steps",
+          flush=True)
 
     traj_path = f"{name}_traj.xyz"
 
@@ -251,8 +296,20 @@ def run_md(atoms, name, temp_K, duration_fs, timestep_fs=0.5):
         dump(f)
         for step in range(nsteps):
             dyn.run(1)
+            dumped = False
             if (step + 1) % dump_every == 0:
                 dump(f)
+                dumped = True
+            if (step + 1) % FRAGMENT_CHECK_EVERY == 0:
+                for pair, r0_ab in r0.items():
+                    r_ab = atoms.get_distance(*pair)
+                    if r_ab > FRAGMENT_RATIO * r0_ab:
+                        print(f"Fragmentation stopping criterion met at step {step + 1}: "
+                              f"bond {pair} r={r_ab:.2f} Ang > {FRAGMENT_RATIO}x r0={r0_ab:.2f} Ang",
+                              flush=True)
+                        if not dumped:
+                            dump(f)
+                        return traj_path
 
     return traj_path
 
@@ -818,7 +875,7 @@ def run_single(calctype, xyzfile, model_name, models_dir, charge, mult, calc=Non
 
 
 def run_md_single(xyzfile, model_name, models_dir, charge, mult, temp_K, duration_fs,
-                   timestep_fs=0.5, calc=None):
+                   timestep_fs=0.5, mdc=0, calc=None):
     """Single reactive-MD trajectory. On failure, simply does not write
     <name>_traj.xyz -- amk.sh already treats a missing trajectory file as
     "this attempt produced nothing" for every other program too.
@@ -835,7 +892,7 @@ def run_md_single(xyzfile, model_name, models_dir, charge, mult, temp_K, duratio
         atoms.info['charge'] = charge
         atoms.info['spin']   = mult
         atoms.calc = calc
-        traj_path = run_md(atoms, name, temp_K, duration_fs, timestep_fs)
+        traj_path = run_md(atoms, name, temp_K, duration_fs, timestep_fs, mdc)
         print(f"Done. Trajectory: {traj_path}", flush=True)
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
@@ -935,8 +992,9 @@ def run_serve(req_fifo, resp_fifo, model_name, models_dir, charge, mult):
             if calctype == 'md':
                 xyzfile, temp_K, duration_fs = args[0], float(args[1]), float(args[2])
                 timestep_fs = float(args[3]) if len(args) > 3 else 0.5
+                mdc = int(args[4]) if len(args) > 4 else 0
                 run_md_single(xyzfile, model_name, models_dir, charge, mult,
-                              temp_K, duration_fs, timestep_fs, calc=calc)
+                              temp_K, duration_fs, timestep_fs, mdc, calc=calc)
             elif calctype == 'partial_opt':
                 xyzfile, frozen_csv = args[0], args[1]
                 if frozen_csv == 'NONE':
@@ -989,8 +1047,8 @@ def main():
         run_single(calctype, xyzfile, model, models_dir, charge, mult)
 
     elif mode == 'md':
-        if len(sys.argv) not in (9, 10):
-            print("Usage: mlip_calc.py md <xyzfile> <model> <models_dir> <charge> <mult> <temp_K> <duration_fs> [timestep_fs]")
+        if len(sys.argv) not in (9, 10, 11):
+            print("Usage: mlip_calc.py md <xyzfile> <model> <models_dir> <charge> <mult> <temp_K> <duration_fs> [timestep_fs] [mdc]")
             sys.exit(1)
         xyzfile     = sys.argv[2]
         model       = sys.argv[3].lower()
@@ -1000,7 +1058,8 @@ def main():
         temp_K      = float(sys.argv[7])
         duration_fs = float(sys.argv[8])
         timestep_fs = float(sys.argv[9]) if len(sys.argv) > 9 else 0.5
-        run_md_single(xyzfile, model, models_dir, charge, mult, temp_K, duration_fs, timestep_fs)
+        mdc         = int(sys.argv[10]) if len(sys.argv) > 10 else 0
+        run_md_single(xyzfile, model, models_dir, charge, mult, temp_K, duration_fs, timestep_fs, mdc)
 
     elif mode == 'partial_opt':
         if len(sys.argv) != 8:

@@ -1,7 +1,9 @@
 #!/bin/bash
 source utils.sh
 #On exit remove tmp files
-tmp_files=(ConnMat tmp_gauss tmp* ScalMat *.arc *.mop fort.* partial_opt ts_opt *_dyn* *_backup rotate.dat minn black_list* bfgs.log none.out forces.xyz velocities.xyz restraints.xyz energies.txt freq.molden min.xyz ts_opt.xyz ts.xyz min_opt.xyz v0 grad.dat grad.* min_popt.xyz min_popt.log opt_start_traj.xyz optstart_ref.* optstart_ref_* *_sella.log *.traj *_vib *_vib.* bbfs.out)
+#TEMP: *_dyn* removed from cleanup while validating the new MD fragmentation
+#stopping criterion (mlip_calc.py run_md) -- restore it once confirmed working.
+tmp_files=(ConnMat tmp_gauss tmp* ScalMat *.arc *.mop fort.* partial_opt ts_opt *_backup rotate.dat minn black_list* bfgs.log none.out forces.xyz velocities.xyz restraints.xyz energies.txt freq.molden min.xyz ts_opt.xyz ts.xyz min_opt.xyz v0 grad.dat grad.* min_popt.xyz min_popt.log opt_start_traj.xyz optstart_ref.* optstart_ref_* *_sella.log *.traj *_vib *_vib.* bbfs.out)
 trap 'err_report2 $LINENO $gauss_line' ERR
 trap cleanup EXIT INT
 
@@ -120,9 +122,9 @@ do
            fi
         elif [ "$program_md" = "mlip" ]; then
            if [ -n "$mlip_server_pid" ]; then
-              mlip_request "md opt_start.xyz $excite $nfs"
+              mlip_request "md opt_start.xyz $excite $nfs 0.5 $mdc"
            else
-              mlip_calc.py md opt_start.xyz $ll_mlip_model $models_dir $charge $mult $excite $nfs &> ${named}.log
+              mlip_calc.py md opt_start.xyz $ll_mlip_model $models_dir $charge $mult $excite $nfs 0.5 $mdc &> ${named}.log
            fi
            if [ ! -f opt_start_traj.xyz ]; then
               echo "${named}.xyz does not exist"
