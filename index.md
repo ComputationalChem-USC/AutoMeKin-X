@@ -146,7 +146,11 @@ where `path_to_program` is the path where you installed amk (_e.g._,
 While mopac comes with the distribution, [gaussian](https://gaussian.com/) and/or [Entos Qcore](https://software.entos.ai/qcore/documentation/) should be installed by the user.
 
 {: .highlight }   
-Entos Qcore, which is free for academia, can be easily installed following these steps:
+Entos Qcore, which is free for academia, can be easily installed following these steps.
+This is the path for someone who followed the
+[beginners tutorial](docs/beginners_install.html) (a plain `conda create -n amk_env
+python=3.11` environment, without qcore bundled in) and now wants to add qcore on top
+of that same `amk_env`, without breaking it in the process:
 
 1. Install [miniconda](https://docs.conda.io/projects/miniconda/en/latest/)
 2. Add the following line to `$HOME/.condarc`{: .language-bash .highlight}, creating the file if not present:
