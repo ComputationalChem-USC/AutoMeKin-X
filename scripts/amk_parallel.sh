@@ -124,16 +124,22 @@ fi
 ###
 echo ""
 echo "Running amk_parallel interactively..."
-#The last job is tors.sh
-nojf=$((nojf + 1))
+#The first ntorstasks jobs are tors.sh (default 1, see ntorstasks keyword)
+nojf=$((nojf + ntorstasks))
+#Reset the torsion work-sharding state before this iteration's parallel jobs
+#start (single-threaded here, so no race with the flock'd partitioning tors.sh
+#does per-shard -- see tors.sh for why this must be cleared every iteration).
+if [ $torsion -ne 0 ]; then
+   rm -f ${tsdirll}/tmp_tors.ready ${tsdirll}/tmp_tors.shard*
+fi
 #Then we submit the nojf-noj1+1 trajectory jobs
 #ft2 slurm
 if [ ! -z $SLURM_JOB_ID ] && [ ! -z $SLURM_NTASKS ]; then
-  if (( $nojf-$noj1+1 < $SLURM_NTASKS )); then 
+  if (( $nojf-$noj1+1 < $SLURM_NTASKS )); then
     echo "WARNING: Number of trajectory jobs ($nojf-$noj1+1) lower than allocated tasks ($SLURM_NTASKS)."
   fi
 fi
-doparallel "runGP.sh {1} $molecule $cwd $nojf $nchan $e0" "$(seq $noj1 $nojf)"
+doparallel "runGP.sh {1} $molecule $cwd $nojf $nchan $e0 $ntorstasks" "$(seq $noj1 $nojf)"
 
 echo "End of calculations."
 rm -rf fort.* min.xyz ScalMat

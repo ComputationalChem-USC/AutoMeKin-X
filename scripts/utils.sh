@@ -194,6 +194,13 @@ function read_input {
    sampling=$(awk 'BEGIN{sa=2};{if($1=="sampling" && $2=="BXDE") sa=0; if($1=="sampling" && $2=="MD-micro") sa=1;if($1=="sampling" && $2=="MD") sa=2;if($1=="sampling" && $2=="ChemKnow") sa=3;if($1=="sampling" && $2=="association") sa=30;if($1=="sampling" && $2=="vdW") sa=31; if($1=="sampling" && $2=="external") sa=4};END{print sa}'  $inputfile)
    tight=$(awk 'BEGIN{ti=1};{if($1=="tight_ts" && $2=="no") ti=0 };END{print ti}' $inputfile)
    torsion=$(awk 'BEGIN{torsion=1};{if($1=="torsion" && $2=="no") torsion=0};END{print torsion}' $inputfile)
+   # Number of parallel tasks dedicated to the torsional scan per iteration
+   # (amk_parallel.sh/runGP.sh). Default 1 matches original behavior (a
+   # single serial task did the whole scan, regardless of nbatch -- this
+   # became a severe bottleneck for systems with many rotatable bonds/fast-
+   # growing minima pools, since that one task's per-iteration workload
+   # grows with the whole run while everything else stays parallel).
+   ntorstasks=$(awk 'BEGIN{nt=1};{if($1=="ntorstasks") nt=$2};END{print nt}' $inputfile)
    md=$(awk 'BEGIN{md=2};{if($1=="sampling" && $2=="BXDE") md=0; if($1=="sampling" && $2=="MD-micro") md=1;if($1=="sampling" && $2=="MD") md=2;if($1=="sampling" && $2=="association") md=-1;if($1=="sampling" && $2=="vdW") md=0; if($1=="sampling" && $2=="external") md=-1};END{print md}'  $inputfile)
    rate=$(awk 'BEGIN{rate=-1};{if ($1=="Temperature") rate=0;if($1=="Energy") rate=1};END{print rate}' $inputfile)
    tread=$(awk 'BEGIN{t=298};{if($1=="Temperature") t=$2};END{printf "%d",t+0.5}' $inputfile)

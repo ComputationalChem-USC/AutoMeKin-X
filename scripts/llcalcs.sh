@@ -98,7 +98,7 @@ while [ $iter -le $niter ]; do
    if [ $nts -lt 0 ]; then
       echo "   All MIN employed "
       echo "   Stop iters here  " 
-      rm -rf batch*
+      rm -rf batch* torsion*
       break 
    fi
 ##check that tslistll file exists
@@ -131,7 +131,7 @@ while [ $iter -le $niter ]; do
       echo "   No new TSs found "
       echo "   Skip this iter   "
       echo ""  
-      rm -rf batch*
+      rm -rf batch* torsion*
       ((iter=iter+1))
       ((convergence=convergence+1))
       if [ $convergence -eq 3 ]; then
@@ -199,7 +199,7 @@ if ([ "$program_opt" = "mopac" ] || [ "$program_opt" = "mlip" ]) && [ "$barrierl
    echo "   time: $tt s"
 fi
 echo "Making final folder: FINAL_LL_${molecule}"
-rm -rf batch*
+rm -rf batch* torsion*
 track_view.sh > final.log
 final.sh > /dev/null
 echo ""

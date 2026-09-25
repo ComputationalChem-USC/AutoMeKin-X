@@ -79,26 +79,59 @@ minrf=${tsdirll}/min_tors.inp
 tmpti=${tsdirll}/tmp_tors.inp
 minr0=${tsdirll}/min_refe.inp
 mindb=${tsdirll}/MINs/SORTED/mins.db
-if [ -f $minfilell ];then
-   if [ -f $confilell ]; then
-      awk 'NR==FNR{for(i=2;i<=NF;i++) {++nc;conf[nc]=$i}};NR>FNR{ok=1;for(i=1;i<=nc;i++) if($2==conf[i]) ok=0;if(ok==1) printf "%5.0f %8.2f\n",$2,$NF}' $confilell $minfilell > $minr0 
-   else
-      awk '{printf "%5.0f %8.2f\n",$2,$NF}' $minfilell > $minr0 
-   fi
-#compare minr0 and minrf
-   awk 'NR==FNR{e[NR]=$2;++nmin};NR>FNR{ok=1;for(i=1;i<=nmin;i++) if($2 == e[i]) ok=0; if(ok==1) printf "%5s %8.2f\n",$1,$2 } ' $minrf $minr0 > $tmpti
-   cat $minrf $tmpti > tmp && mv tmp $minrf   
-else
-   echo " min0     0.00" > $minrf
-   echo " min0     0.00" > $tmpti
-fi
 
-if [ $(wc -l $tmpti | awk '{print $1}') -eq 0 ]; then
-   echo No further min have been found
+# When several parallel tasks share the torsional-scan work (ntorstasks
+# keyword, see amk_parallel.sh/runGP.sh), TORS_SHARD/TORS_NSHARDS identify
+# this task's slice (default 1/1 for a lone task, unchanged behavior).
+# The "which minima are new since the last scan" computation below touches
+# the shared $minrf/$tmpti files (outside any per-batch cwd), so it must
+# run exactly once per iteration, not once per shard -- flock serializes
+# that, and whichever shard gets there first also partitions the new-minima
+# list round-robin into one file per shard (tmp_tors.shardN) for everyone
+# to read afterwards. amk_parallel.sh clears tmp_tors.ready/tmp_tors.shard*
+# once, single-threaded, before dispatching this iteration's parallel jobs,
+# so a stale "ready" marker from a previous iteration can't be mistaken for
+# this one's.
+TORS_SHARD="${TORS_SHARD:-1}"
+TORS_NSHARDS="${TORS_NSHARDS:-1}"
+tmpti_ready=${tsdirll}/tmp_tors.ready
+tmpti_lock=${tsdirll}/tmp_tors.lock
+tmpti_mine=${tsdirll}/tmp_tors.shard${TORS_SHARD}
+
+(
+   flock -x 202
+   if [ ! -f "$tmpti_ready" ]; then
+      if [ -f $minfilell ];then
+         if [ -f $confilell ]; then
+            awk 'NR==FNR{for(i=2;i<=NF;i++) {++nc;conf[nc]=$i}};NR>FNR{ok=1;for(i=1;i<=nc;i++) if($2==conf[i]) ok=0;if(ok==1) printf "%5.0f %8.2f\n",$2,$NF}' $confilell $minfilell > $minr0
+         else
+            awk '{printf "%5.0f %8.2f\n",$2,$NF}' $minfilell > $minr0
+         fi
+#compare minr0 and minrf
+         awk 'NR==FNR{e[NR]=$2;++nmin};NR>FNR{ok=1;for(i=1;i<=nmin;i++) if($2 == e[i]) ok=0; if(ok==1) printf "%5s %8.2f\n",$1,$2 } ' $minrf $minr0 > $tmpti
+         cat $minrf $tmpti > tmp && mv tmp $minrf
+      else
+         echo " min0     0.00" > $minrf
+         echo " min0     0.00" > $tmpti
+      fi
+      rm -f ${tsdirll}/tmp_tors.shard*
+      awk -v n="$TORS_NSHARDS" -v base="${tsdirll}/tmp_tors.shard" '{
+         s = ((NR-1) % n) + 1
+         print $0 >> (base s)
+      }' $tmpti
+      for s in $(seq 1 $TORS_NSHARDS); do
+         [ -f ${tsdirll}/tmp_tors.shard$s ] || : > ${tsdirll}/tmp_tors.shard$s
+      done
+      touch "$tmpti_ready"
+   fi
+) 202>>${tmpti_lock}
+
+if [ $(wc -l $tmpti_mine 2>/dev/null | awk '{print $1}') -eq 0 ]; then
+   echo No further min have been found for this shard
    exit 1
 fi
 
-for min in $(awk '{print $1}' $tmpti)
+for min in $(awk '{print $1}' $tmpti_mine)
 do
    printf "\n=====MIN: %4s =====\n" $min
    names="MIN"$min

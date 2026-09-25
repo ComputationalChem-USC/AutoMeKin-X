@@ -1,11 +1,17 @@
 #!/bin/bash
 ## This script is invoked as:
-##doparallel "runGP.sh {1} $molecule $cwd $nojf $nchan" "$(seq $noj1 $nojf)"
-##The first job is the tors scan
-batchn=$(($1-1))
-if [ $1 -eq 1 ];then
-   batch=torsion
+##doparallel "runGP.sh {1} $molecule $cwd $nojf $nchan $e0 $ntorstasks" "$(seq $noj1 $nojf)"
+##The first $ntorstasks jobs are tors scan shards (ntorstasks defaults to 1
+##when not passed, matching the original single-torsion-task behavior).
+ntors="${7:-1}"
+if [ $1 -le $ntors ]; then
+   if [ $ntors -eq 1 ]; then
+      batch=torsion
+   else
+      batch=torsion$1
+   fi
 else
+   batchn=$(($1-$ntors))
    batch=batch$batchn
 fi
 #Make batch directory
@@ -22,8 +28,8 @@ if [ $copyfrags -eq 1 ]; then
    cp ${frA}.xyz ${frB}.xyz ${batch}
 fi
 ##Launch the calcs
-if [ $1 -eq 1 ]; then
-   (cd ${batch} && tors.sh > scan_tors.log)
+if [ $1 -le $ntors ]; then
+   (cd ${batch} && TORS_SHARD=$1 TORS_NSHARDS=$ntors tors.sh > scan_tors.log)
 elif [ $5 -eq 0 ]; then
    (cd ${batch} && amk.sh amk.dat >amk.log)
 else
