@@ -1470,11 +1470,27 @@ function orca_input {
    # Memoria por proceso en MB
    mem_mb=$(echo "$mem * 1000 / $nprocs" | bc)
 
-   # Frecuencias numericas solo para metodos post-HF
-   if [ "$HLcalc" = "CCSDT" ] || [ "$HLcalc" = "MP2" ]; then
+   # Detectar funcionales VV10 (terminan en "-V", ej. wB97M-V) que requieren Hessiana numerica
+   functional="$(echo "$levelc" | cut -d'/' -f1)"
+   if [[ "$functional" =~ -[Vv]$ ]]; then
+      is_vv10=1
+   else
+      is_vv10=0
+   fi
+
+   # Frecuencias numericas para metodos post-HF o funcionales VV10
+   if [ "$HLcalc" = "CCSDT" ] || [ "$HLcalc" = "MP2" ] || [ "$is_vv10" -eq 1 ]; then
       freq_keyword="NumFreq"
    else
       freq_keyword="Freq"
+   fi
+
+   # VV10 tambien necesita NumHess true junto a Calc_Hess true (TS/IRC)
+   if [ "$is_vv10" -eq 1 ]; then
+      numhess_line="
+  NumHess true"
+   else
+      numhess_line=""
    fi
 
    if [ "$calc" = "ts" ]; then
@@ -1482,7 +1498,7 @@ function orca_input {
 %maxcore $mem_mb
 %pal nprocs $nprocs end
 %geom
-  Calc_Hess true
+  Calc_Hess true$numhess_line
   Recalc_Hess 5
   MaxIter 100
   cartfallback true
@@ -1542,7 +1558,7 @@ end"
 end
 
 %geom
-  Calc_Hess true
+  Calc_Hess true$numhess_line
   Recalc_Hess 10
 end"
       inp_hl="$(echo -e "$cal\n* xyz $charge $mult\n$geo\n*")"
