@@ -79,6 +79,10 @@ IRC_ETA   = 1e-4
 IRC_GAMMA = 0.4
 IRC_FMAX  = 0.01   # eV/Å — looser than TS opt to walk the full IRC path
 IRC_STEPS = 1000
+# Minimum displacement (Ang) / energy drop (kcal/mol) for an IRC endpoint to
+# count as having left the TS.
+IRC_MIN_DISP   = 0.10
+IRC_MIN_DROP   = 0.5
 
 # Post-minopt imaginary-frequency check. Below this magnitude, a negative
 # frequency is treated as Eckart-projection numerical noise (e.g. extra
@@ -194,16 +198,49 @@ def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
     # well-converged TS (forces < fmax) would stop immediately at step 0.
     # Force at least one kick along the imaginary mode before allowing
     # convergence to be declared.
+    # Since ASE 3.23, Optimizer.irun() calls gradient_converged() and never
+    # Sella's IRC.converged(), so a TS whose residual forces are already
+    # < fmax after the first kick is "converged" on the saddle point itself,
+    # and minopt then drops both endpoints into the same basin. Only allow
+    # convergence once the walk has actually left the TS. (Sella's own
+    # positive-curvature condition is not used: its Hessian is not projected
+    # for translations/rotations, so on loose fragment complexes, e.g. H...HOCO,
+    # it never holds and the walk overshoots into a different product.)
+    x0 = atoms.get_positions().copy()
+    e0 = atoms.get_potential_energy()
+
+    def _left_ts():
+        disp = np.linalg.norm(atoms.get_positions() - x0)
+        drop = (e0 - atoms.get_potential_energy()) * mol / kcal
+        return disp >= IRC_MIN_DISP and drop >= IRC_MIN_DROP
+
     class _IRC(IRC):
         def gradient_converged(self, gradient):
-            if self.nsteps == 0:
+            if self.nsteps == 0 or not _left_ts():
                 return False
             return super().gradient_converged(gradient)
 
     print(f"  IRC {direction} with Sella (dx={dx}, fmax={fmax} eV/Ang, max_steps={steps})",
           flush=True)
+    # Exact (finite-difference) Hessian for the initial diagonalization:
+    # Sella's default iterative estimate (Davidson, tolerance gamma) can miss
+    # the imaginary mode altogether (all eigenvalues > 0), and then the first
+    # kick goes along a stiff mode and falls back onto the TS.
+    calc = atoms.calc
+
+    def _exact_hessian(at):
+        from ase.vibrations import Vibrations
+        work = at.copy()
+        work.info.update(atoms.info)
+        work.calc = calc
+        vib = Vibrations(work, name=f'{name}_irchess')
+        vib.run()
+        h = vib.get_vibrations().get_hessian_2d()
+        vib.clean()
+        return h
+
     dyn = _IRC(atoms, trajectory=f'{name}.traj', dx=dx, eta=eta, gamma=gamma,
-               keep_going=True)
+               keep_going=True, hessian_function=_exact_hessian)
     # Sella warns whenever the inner loop misses on any single outer step,
     # even if the walk (keep_going=True) later still reaches the final
     # convergence check successfully -- confirmed on the FA 5-iter validation
@@ -215,6 +252,15 @@ def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
         warnings.filterwarnings("ignore", message="IRC inner loop failed to converge.*")
         converged = dyn.run(fmax=fmax, steps=steps, direction=direction)
     print(f"  Steps: {dyn.nsteps}, Converged: {converged}", flush=True)
+
+    # Safety net: an endpoint that has not left the TS region would give a
+    # spurious MINn<->MINn connection; report it as not converged.
+    disp = np.linalg.norm(atoms.get_positions() - x0)
+    drop = (e0 - atoms.get_potential_energy()) * mol / kcal
+    if disp < IRC_MIN_DISP or drop < IRC_MIN_DROP:
+        print(f"  WARNING: IRC {direction} did not leave the TS (disp={disp:.3f} Ang, "
+              f"drop={drop:.2f} kcal/mol)", flush=True)
+        converged = False
     return converged
 
 
