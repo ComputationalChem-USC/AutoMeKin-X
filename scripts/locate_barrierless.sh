@@ -159,7 +159,7 @@ if [ -f tsdir${tag}_${molecule}/min_diss.inp ]; then
                geom="$(cat tmp_geom | awk 'NR>2{print $0}')"
                id=$(sqlite3 tsdir${tag}_${molecule}/PRODs/prod.db "select max(id) from prod")
                id=$((id+1))
-               zpe=0
+               zpe=$(awk 'BEGIN{z=0};/Product ZPE/{z=$(NF-1)};END{print z}' batch${chan}/amk.log)
                g=0
                freq=""
                name=PR${id}_min_diss_${i}_${chan}

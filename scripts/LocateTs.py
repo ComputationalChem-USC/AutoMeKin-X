@@ -157,6 +157,41 @@ def vib_calc(ts):
         eigenv.append(vib.get_mode(i))
     return eigenv,freq
 
+#Ground-state multiplicity of neutral isolated atoms (Hund's rule). The parity rule (noue+1) gives
+#singlet O/C/S/Si, which matters for spin-dependent MLIPs such as MACE (O singlet ~ +63 kcal/mol).
+ATOM_MULT = {'H': 2, 'He': 1, 'Li': 2, 'Be': 1, 'B': 2, 'C': 3, 'N': 4, 'O': 3, 'F': 2, 'Ne': 1,
+             'Na': 2, 'Mg': 1, 'Al': 2, 'Si': 3, 'P': 4, 'S': 3, 'Cl': 2, 'Ar': 1}
+
+
+def fragment_energy(mol, G):
+    ekcal = units.mol / units.kcal
+    etot, zpe = 0., 0.
+    for k, c in enumerate(nx.connected_components(G)):
+        frag = mol[sorted(c)]
+        frag.set_constraint()
+        noue = int(sum(frag.get_atomic_numbers())) % 2
+        frag.calc = mlip_calc_obj
+        frag.info['charge'] = 0
+        if len(frag) == 1 and frag[0].symbol in ATOM_MULT:
+            frag.info['spin'] = ATOM_MULT[frag[0].symbol]
+        else:
+            frag.info['spin'] = noue + 1
+        if len(frag) > 1:
+            BFGS(frag, logfile='bfgs_frag'+str(k)+'.log').run(fmax=0.01, steps=500)
+        e = frag.get_potential_energy() * ekcal
+        z = 0.
+        if len(frag) > 1:
+            vib = Vibrations(frag, name='vib_frag'+str(k))
+            vib.run()
+            f = np.sort(np.abs(np.real(vib.get_frequencies())))[5 if len(frag) == 2 else 6:]
+            z = 0.5 * f.sum() * units.invcm * ekcal
+            vib.clean()
+        print('Fragment',k,frag.get_chemical_formula(),'mult',frag.info['spin'],'E',round(e,4),'ZPE',round(z,4))
+        etot += e
+        zpe += z
+    return etot, zpe
+
+
 def attach_calculators(images):
     for image in images:
         if prog == 'mopac': image.calc = MOPACamk(method=method+' threads=1 charge='+charge,relscf=0.01)
@@ -515,6 +550,12 @@ if prog == 'mopac':
     ep = rmol.calc.get_final_heat_of_formation() * units.mol / units.kcal
 else:
     ep = rmol.get_potential_energy() * units.mol / units.kcal
+#MLIP: a fragmented product computed as one supermolecule at the global multiplicity gives a wrong
+#asymptote for radical pairs (e.g. HCO+OH at mult=1). Use the sum of the fragments, each optimized
+#at its own multiplicity (same noue+1 rule as HLscripts/PRODs.sh), and report their ZPE.
+if prog == 'mlip' and not nx.is_connected(Gx) and int(charge) == 0:
+    ep, zpe_p = fragment_energy(rmol, Gx)
+    print('{:s} {:10.4f} {:s}'.format('Product ZPE: ',zpe_p,'kcal/mol'))
 dE = ep - e0
 print('{:s} {:10.4f} {:s}'.format('Product energy rel: ',dE,'kcal/mol'))
 print('{:s} {:10.4f} {:s}'.format('Product energy abs: ',ep,'kcal/mol'))
