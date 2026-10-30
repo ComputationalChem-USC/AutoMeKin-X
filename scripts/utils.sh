@@ -973,12 +973,13 @@ if [ $sampling -ne 4 ]; then
 fi
 }
 
-## Persistent mlip_calc.py worker for one amk.sh batch. Loading the UMA
-## checkpoint is ~80% of a single mlip_calc.py call's wall time; amk.sh's
-## trajectory loop makes many such calls per batch (one MD run plus one
-## partial_opt+tsopt pair per bond-change event it detects), each currently
-## paying that reload cost again. Only worth it for uma -- mace's checkpoint
-## loads in under a second, nothing to amortize there.
+## Persistent mlip_calc.py worker for one amk.sh batch or tors.sh task.
+## Loading the UMA checkpoint is ~80% of a single mlip_calc.py call's wall
+## time; amk.sh's trajectory loop (one MD run plus one partial_opt+tsopt pair
+## per bond-change event) and tors.sh's scan loop (one dihedral_scan per
+## dihedral plus one tsopt per candidate maximum) make many such calls, each
+## paying that reload cost again. Used for mace too: its checkpoint loads
+## fast, but every direct call still pays the python/torch/mace start-up.
 function mlip_server_start {
    mlip_req_fifo="${cwd}/.mlip_req_$$.fifo"
    mlip_resp_fifo="${cwd}/.mlip_resp_$$.fifo"
@@ -1021,6 +1022,19 @@ function mlip_server_stop {
 function mlip_request {
    echo "$1" > "$mlip_req_fifo"
    read -r mlip_resp < "$mlip_resp_fifo"
+}
+
+## Usage: mlip_run <calctype> <args...> -- for calctypes whose direct command
+## line ends in "<model> <models_dir> <charge> <mult>" (tsopt, minopt,
+## partial_opt, dihedral_scan; not md). Goes through the persistent server
+## when one is alive, otherwise falls back to a direct mlip_calc.py call, so
+## a server that failed to start or died only costs speed, not results.
+function mlip_run {
+   if [ -n "$mlip_server_pid" ] && kill -0 $mlip_server_pid 2>/dev/null; then
+      mlip_request "$*"
+   else
+      mlip_calc.py "$@" $ll_mlip_model $models_dir $charge $mult
+   fi
 }
 
 function opt_start {

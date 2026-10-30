@@ -36,12 +36,14 @@ LL reactive-sampling modes (used by amk.sh when LowLevel is mlip):
       already produces, so the shared local-maximum finder there is unchanged.
 
 Persistent-server mode (loads model once, then services jobs one at a time
-read from a fifo -- used by amk.sh for the UMA path, where model loading is
-~80% of a single call's wall time; not wired up for mace, whose checkpoint
-loads in under a second so there is nothing to amortize):
+read from a fifo -- used by amk.sh and tors.sh for both uma and mace: for uma
+model loading is ~80% of a single call's wall time; for mace the checkpoint
+itself loads fast, but every direct call still pays the python/torch/mace
+start-up):
   mlip_calc.py serve <req_fifo> <resp_fifo> <model> <models_dir> <charge> <mult>
-      Each line read from req_fifo is "<calctype> <args...>", the same
-      tail normally passed on the command line for md/partial_opt/tsopt/minopt.
+      Each line read from req_fifo is "<calctype> <args...>", the same tail
+      normally passed on the command line for
+      md/partial_opt/tsopt/minopt/dihedral_scan.
       Writes "DONE" or "ERROR: <msg>" to resp_fifo after each job. A "QUIT"
       line ends the loop.
 
@@ -984,15 +986,20 @@ def run_partial_opt_single(xyzfile, frozen_csv, model_name, models_dir, charge, 
 
 
 def run_dihedral_scan_single(xyzfile, dihedral_csv, dihed0, model_name, models_dir, charge,
-                              mult, npoints=36, step_deg=10.0):
+                              mult, npoints=36, step_deg=10.0, calc=None):
     """Relaxed torsional scan (see run_dihedral_scan). Writes tors.out in the
     cwd; on failure tors.out is simply not written, same as qcore's branch
-    leaving no usable tors.out when entos.py fails outright."""
+    leaving no usable tors.out when entos.py fails outright.
+
+    If calc is given (persistent-server reuse via run_serve), skips loading
+    the model and re-raises on error instead of exiting the process."""
+    reuse = calc is not None
     dihedral_indices = [int(i) - 1 for i in dihedral_csv.split(',')]
     print(f"AMK_MLIP: dihedral_scan | model={model_name} | atoms(1-based)={dihedral_csv} | "
           f"dihed0={dihed0}", flush=True)
     try:
-        calc  = load_calculator(model_name, models_dir)
+        if calc is None:
+            calc = load_calculator(model_name, models_dir)
         atoms = read(xyzfile)
         atoms.info['charge'] = charge
         atoms.info['spin']   = mult
@@ -1002,24 +1009,28 @@ def run_dihedral_scan_single(xyzfile, dihedral_csv, dihed0, model_name, models_d
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         traceback.print_exc()
+        if reuse:
+            raise
         sys.exit(1)
 
 
 def run_serve(req_fifo, resp_fifo, model_name, models_dir, charge, mult):
-    """Persistent worker for one amk.sh batch. Loading the UMA checkpoint
-    dominates the cost of every single mlip_calc.py call (~30s of a ~40s
-    call); amk.sh's trajectory loop makes many such calls (one MD run plus
-    one partial_opt+tsopt pair per bond-change event it detects), each
-    currently paying that cost again. This loads the model once and then
-    services one job at a time, read as a single line from req_fifo ("md
-    <xyzfile> <temp_K> <duration_fs> [timestep_fs]" / "partial_opt <xyzfile>
-    <frozen_csv>" / "tsopt|minopt <xyzfile>" -- the same tail already passed
-    on the command line for each mode), dispatching to the *_single functions
-    with the reused calculator. Writes DONE/ERROR <msg> to resp_fifo after
-    each job purely as a completion signal for the bash caller (mlip_request
-    in utils.sh) to block on; the existing output-file / AMK_TERMINATED_NORMALLY
-    checks in amk.sh are still what decides success, unchanged. Exits on a
-    QUIT line (or the request fifo's writer going away for good)."""
+    """Persistent worker for one amk.sh batch or tors.sh task. Loading the
+    UMA checkpoint dominates the cost of every single mlip_calc.py call
+    (~30s of a ~40s call), and even for mace each direct call pays the
+    python/torch start-up; amk.sh's trajectory loop and tors.sh's scan loop
+    make many such calls, each currently paying that cost again. This loads
+    the model once and then services one job at a time, read as a single line
+    from req_fifo ("md <xyzfile> <temp_K> <duration_fs> [timestep_fs]" /
+    "partial_opt <xyzfile> <frozen_csv>" / "tsopt|minopt <xyzfile>" /
+    "dihedral_scan <xyzfile> <a1,a2,a3,a4> <dihed0>" -- the same tail already
+    passed on the command line for each mode), dispatching to the *_single
+    functions with the reused calculator. Writes DONE/ERROR <msg> to
+    resp_fifo after each job purely as a completion signal for the bash
+    caller (mlip_request in utils.sh) to block on; the existing output-file /
+    AMK_TERMINATED_NORMALLY checks in amk.sh/tors.sh are still what decides
+    success, unchanged. Exits on a QUIT line (or the request fifo's writer
+    going away for good)."""
     print(f"AMK_MLIP serve: loading {model_name}...", flush=True)
     calc = load_calculator(model_name, models_dir)
     print("AMK_MLIP serve: model loaded, ready for jobs", flush=True)
@@ -1050,6 +1061,10 @@ def run_serve(req_fifo, resp_fifo, model_name, models_dir, charge, mult):
             elif calctype in ('tsopt', 'minopt'):
                 xyzfile = args[0]
                 run_single(calctype, xyzfile, model_name, models_dir, charge, mult, calc=calc)
+            elif calctype == 'dihedral_scan':
+                xyzfile, dihedral_csv, dihed0 = args[0], args[1], float(args[2])
+                run_dihedral_scan_single(xyzfile, dihedral_csv, dihed0, model_name, models_dir,
+                                         charge, mult, calc=calc)
             else:
                 raise ValueError(f"serve: unknown calctype '{calctype}'")
         except Exception as e:

@@ -44,10 +44,10 @@ if [ -f $kmcfilell ] && [ -f $minfilell ] && [ $mdc -ge 1 ] && [ $ndis -eq 1 ]; 
 generate_dynamics_template
 ##make temporary folders
 make_temp_folders
-##Start a persistent mlip_calc.py worker for this batch (uma only -- see
+##Start a persistent mlip_calc.py worker for this batch (uma or mace -- see
 ##mlip_server_start in utils.sh) so opt_start and the trajectory loop below
 ##don't reload the model on every call.
-if [ "$ll_mlip_model" = "uma" ] && { [ "$program_md" = "mlip" ] || [ "$program_opt" = "mlip" ]; }; then
+if [ -n "$ll_mlip_model" ] && { [ "$program_md" = "mlip" ] || [ "$program_opt" = "mlip" ]; }; then
    mlip_server_start
 fi
 ###Opt the starting structure and get e0 and emaxts

@@ -130,6 +130,13 @@ if [ $(wc -l $tmpti_mine 2>/dev/null | awk '{print $1}') -eq 0 ]; then
    echo No further min have been found for this shard
    exit 1
 fi
+##Persistent mlip_calc.py worker for this task (see mlip_server_start in
+##utils.sh): the scan below makes one dihedral_scan per dihedral plus one
+##tsopt per candidate maximum, and the number of minima to scan grows every
+##iteration. Stopped by cleanup on exit.
+if [ "$program_opt" = "mlip" ] && [ -n "$ll_mlip_model" ]; then
+   mlip_server_start
+fi
 
 for min in $(awk '{print $1}' $tmpti_mine)
 do
@@ -240,7 +247,7 @@ do
          done
       elif [ "$program_opt" = "mlip" ]; then
          cp mingeom mingeom_tors.xyz
-         mlip_calc.py dihedral_scan mingeom_tors.xyz "$labels" $dihed0 $ll_mlip_model $models_dir $charge $mult
+         mlip_run dihedral_scan mingeom_tors.xyz "$labels" $dihed0
       else
          internlastatom="$(awk '{print $1,$2,$3,$4," 0 ",$6,$7,'$l1','$l2','$l3'}' intern.out)"
          sed 's/method/'"$method"' charge='$charge'/g' $sharedir/path_template >tors.mop
@@ -307,7 +314,7 @@ do
             echo $natom > ${cand}.xyz
             echo ""     >> ${cand}.xyz
             cat geomts_tors >> ${cand}.xyz
-            mlip_calc.py tsopt ${cand}.xyz $ll_mlip_model $models_dir $charge $mult
+            mlip_run tsopt ${cand}.xyz
             if [ ! -f ${cand}.log ] || ! grep -q AMK_TERMINATED_NORMALLY ${cand}.log; then
                printf "     Pt%2s: failed-->EF algorithm was unable to optimize a TS\n" $inmax
                rm -f ${cand}.xyz ${cand}.log
