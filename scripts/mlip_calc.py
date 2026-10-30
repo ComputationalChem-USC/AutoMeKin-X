@@ -46,6 +46,8 @@ start-up):
       md/partial_opt/tsopt/minopt/dihedral_scan.
       Writes "DONE" or "ERROR: <msg>" to resp_fifo after each job. A "QUIT"
       line ends the loop.
+      For uma on GPU the server uses faster inference settings (see
+      load_calculator(fast=True)); set AMK_MLIP_FAST=0 to disable.
 
 Supported models: uma, mace
 """
@@ -113,7 +115,17 @@ def get_device():
     return 'cuda'
 
 
-def load_calculator(model_name, models_dir):
+def load_calculator(model_name, models_dir, fast=False):
+    """fast=True (uma on GPU only; ignored otherwise): fairchem's "turbo"
+    inference settings with tf32 disabled -- MoLE experts merged for the first
+    composition seen plus torch.compile. Benchmarked on the full FA network
+    (28 TSs + 11 MINs, PROJECTS_Low_Level/uma_benchmark_FA): same energies,
+    geometries and frequencies as the default settings, ~1.9x faster Sella
+    opt+freq. Stock turbo (tf32 on) is NOT used: its noisier forces left
+    7/28 TSs unconverged at fmax 0.005. Only meant for the persistent server
+    (run_serve): the first call pays ~40-115 s of compilation, and the merged
+    model raises on any other composition, so the caller needs a default calc
+    to fall back on."""
     device = get_device()
     models_path = Path(models_dir)
 
@@ -125,7 +137,13 @@ def load_calculator(model_name, models_dir):
         if not model_path.exists():
             raise FileNotFoundError(f"UMA model not found: {model_path}")
         atom_refs = OmegaConf.load(refs_path) if refs_path.exists() else None
+        settings = 'default'
+        if fast and device == 'cuda':
+            import dataclasses
+            from fairchem.core.units.mlip_unit.api.inference import inference_settings_turbo
+            settings = dataclasses.replace(inference_settings_turbo(), tf32=False)
         pred_unit = pretrained_mlip.load_predict_unit(str(model_path), device=device,
+                                                      inference_settings=settings,
                                                       atom_refs=atom_refs)
         return FAIRChemCalculator(pred_unit, task_name='omol')
 
@@ -1030,10 +1048,33 @@ def run_serve(req_fifo, resp_fifo, model_name, models_dir, charge, mult):
     caller (mlip_request in utils.sh) to block on; the existing output-file /
     AMK_TERMINATED_NORMALLY checks in amk.sh/tors.sh are still what decides
     success, unchanged. Exits on a QUIT line (or the request fifo's writer
-    going away for good)."""
-    print(f"AMK_MLIP serve: loading {model_name}...", flush=True)
-    calc = load_calculator(model_name, models_dir)
+    going away for good).
+
+    uma on GPU: the fast calculator (load_calculator(fast=True)) is used for
+    every job whose composition matches the first one served; a default
+    calculator is loaded lazily for any other composition, since the merged
+    model can't handle it. AMK_MLIP_FAST=0 disables the fast path."""
+    use_fast = model_name == 'uma' and os.environ.get('AMK_MLIP_FAST', '1') != '0'
+    print(f"AMK_MLIP serve: loading {model_name} (fast={use_fast})...", flush=True)
+    fast_calc = load_calculator(model_name, models_dir, fast=use_fast)
+    fast_formula = None
+    default_calc = None if use_fast else fast_calc
     print("AMK_MLIP serve: model loaded, ready for jobs", flush=True)
+
+    def pick_calc(xyzfile):
+        nonlocal fast_formula, default_calc
+        if not use_fast:
+            return fast_calc
+        formula = read(xyzfile).get_chemical_formula()
+        if fast_formula is None:
+            fast_formula = formula
+        if formula == fast_formula:
+            return fast_calc
+        if default_calc is None:
+            print(f"AMK_MLIP serve: composition {formula} != {fast_formula}, "
+                  f"loading default {model_name} calculator", flush=True)
+            default_calc = load_calculator(model_name, models_dir)
+        return default_calc
 
     while True:
         with open(req_fifo) as rf:
@@ -1046,6 +1087,7 @@ def run_serve(req_fifo, resp_fifo, model_name, models_dir, charge, mult):
         print(f"\n--- serve: {calctype} {' '.join(args)} ---", flush=True)
         status = 'DONE'
         try:
+            calc = pick_calc(args[0])
             if calctype == 'md':
                 xyzfile, temp_K, duration_fs = args[0], float(args[1]), float(args[2])
                 timestep_fs = float(args[3]) if len(args) > 3 else 0.5
