@@ -1,6 +1,6 @@
 # AutoMeKin-X: Next-Generation Development Version of AutoMeKin 2026.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/emartineznunez/AutoMeKin/blob/main/notebooks/AutoMeKin.ipynb) [![Sylabs - AutoMeKin](https://img.shields.io/badge/Sylabs-AutoMeKin-2ea44f)](https://cloud.sylabs.io/library/emartineznunez/default/automekin) [![AutoMeKin - SOURCEFORGE](https://img.shields.io/badge/AutoMeKin-SOURCEFORGE-2ea44f?logo=%23FF6600)](https://sourceforge.net/projects/automekin-rev1140/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb) [![Sylabs - AutoMeKin](https://img.shields.io/badge/Sylabs-AutoMeKin-2ea44f)](https://cloud.sylabs.io/library/emartineznunez/default/automekin) [![AutoMeKin - SOURCEFORGE](https://img.shields.io/badge/AutoMeKin-SOURCEFORGE-2ea44f?logo=%23FF6600)](https://sourceforge.net/projects/automekin-rev1140/)
 
 ### This is the official repository of the automated reaction discovery program **AutoMeKin**.
 
@@ -137,8 +137,8 @@ conda env create -f automekin.yml
 
 ## Simple examples in Colab <a name="colab"></a>
 
-- [Notebook 1](https://colab.research.google.com/github/emartineznunez/AutoMeKin/blob/main/notebooks/AutoMeKin.ipynb) — install, run a basic example, explore results.
-- [Notebook 2](https://colab.research.google.com/github/emartineznunez/AutoMeKin/blob/main/notebooks/AutoMeKin2.ipynb) — further tests and advanced options.
+- [Notebook 1](https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb) — install, run a basic example, explore results.
+- [Notebook 2](https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin2.ipynb) — further tests and advanced options.
 
 ---
 
