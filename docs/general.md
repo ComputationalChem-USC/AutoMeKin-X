@@ -35,7 +35,7 @@ List of <code>Keyword value(s)</code> for this section:
 <code>LowLevel values</code>   
 [two <code>values</code>: two strings; the second string accepts blank spaces; default: <code>mopac pm7</code>]  
 
-The first <code>value</code> is the program and the second the semiempirical method. So far, <code>qcore</code> and <code>mopac</code> are valid programs. For <code>qcore</code> only <code>xtb</code> method is implemented, and for <code>mopac</code>, any of the semiempirical methods of MOPAC2016 can be employed to run the MD simulations. You can use a combination of MOPAC keywords. In the example above, for instance, the pm7 semiempirical level together with a maximum CPU time, for any type of mopac calculation, of 3 minutes is requested. The use of the MOPAC keyword `t=`, followed by an amount of time, is highly recommended to enhance the efficiency of the calculations. 
+The first <code>value</code> is the program and the second the semiempirical method. <code>mopac</code> and <code>qcore</code> are the valid programs for the MD sampling (see [Engines](engines.html)). For <code>qcore</code> only <code>xtb</code> method is implemented, and for <code>mopac</code>, any of the semiempirical methods of MOPAC2016 can be employed to run the MD simulations. You can use a combination of MOPAC keywords. In the example above, for instance, the pm7 semiempirical level together with a maximum CPU time, for any type of mopac calculation, of 3 minutes is requested. The use of the MOPAC keyword `t=`, followed by an amount of time, is highly recommended to enhance the efficiency of the calculations. 
 
 If you do not employ the keyword <code>LowLevel_TSopt</code>, explained below in advanced options, both the low-level TS optimizations and MD simulations are carried out using the semiempirical method specified by the second value. This is in general a good choice both in terms of efficacy and efficiency, and also because all structures will be re-optimized later using ab initio/DFT methods as specified with the keyword HighLevel.
 
@@ -49,13 +49,20 @@ of the _ab initio_/DFT methods already at this stage for the TS optimizations us
 [two <code>values</code>: two strings; no blank spaces in each string; _mandatory keyword except for
 association_]
 
-The first <code>value</code> is the program (<code>g09</code>, <code>g16</code> or <code>qcore</code> are the possible choices) and the second indicates the level of theory employed in the high-level calculations. For gaussian, you can employ a dual-level approach, which includes a higher level to refine the energy, as shown in the following example:
+The first <code>value</code> is the program (<code>g09</code>, <code>g16</code>, <code>orca</code>, <code>qcore</code> or <code>mlip</code>) and the second indicates the level of theory employed in the high-level calculations, or the model name for <code>mlip</code> (<code>uma</code> or <code>mace</code>). Some examples:
+```
+HighLevel g16  b3lyp/6-31G(d,p)
+HighLevel orca wb97x-d3/def2-tzvp
+HighLevel mlip uma
+``` For gaussian, you can employ a dual-level approach, which includes a higher level to refine the energy, as shown in the following example:
 ```
 HighLevel g16 ccsd(t)/6-311+G(2d,2p)//b3lyp/6-31G(d,p)
 ```
 For <code>g09/g16</code>, supported methods are HF, MP2 and DFT for geometry optimizations and HF, MP2, DFT and CCSD$($T$)$ for single point energy calculations.
 
 For <code>qcore</code>, the method is specified in an additional file named qcore_template. An example of such file is given in the FA_qcore example. This option also allows an extra keyword: <code>hessianmethod</code>, which could accept the values <code>analytic</code> or <code>semianalytic</code>.
+
+For <code>orca</code>, the method uses the same <code>method/basis</code> syntax. With <code>r2scan-3c</code>, an optional fourth value, <code>delta</code>, applies a [delta-ML correction](engines.html#delta) to the final energies. For <code>mlip</code>, see [Using ML potentials](mlip.html).
 
 {: .important }  
 <code>HL_rxn_network value(s)</code>  
@@ -67,7 +74,7 @@ Alternatively, you may use <code>reduced</code> as the first value, the default,
 
 {: .important }  
 <code>IRCpoints value</code>  
-[<code>value</code> is an integer; default value: <code>100</code> ]
+[<code>value</code> is an integer; default value: <code>100</code> for g09/g16 and mlip, <code>500</code> for qcore and <code>20</code> for orca]
 
 <code>value</code> is the maximum number of IRC points in each direction computed at the high-level. Note that g09/g16 calculations need much fewer points than Entos Qcore.
 

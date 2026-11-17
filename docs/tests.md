@@ -1,7 +1,7 @@
 ---
 title: Running the tests
 layout: home
-nav_order: 2
+nav_order: 5
 ---
 
 
@@ -9,7 +9,7 @@ nav_order: 2
 
 To run the tests follow these steps:
 
-1. Load the module, unless you use singularity:
+1. Load the module (or make sure the AutoMeKin-X folders are on your `PATH`, as described in [Installation](installation.html)):
 ```bash
 module load amk/2021
 ```

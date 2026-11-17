@@ -1,252 +1,63 @@
 ---
-title: 🚀Quick start & Installion
+title: Home
 layout: home
 nav_order: 1
 ---
 
-<p align="center">
-   <img src="{{ "/assets/images/banner.jpg" | relative_url }}" alt="AutoMeKin-X banner" class="hero-banner">
-</p>
+<img class="hero-banner" src="{{ "/assets/images/banner.jpg" | relative_url }}" alt="AutoMeKin-X">
+
+<div class="hero">
+  <span class="hero-eyebrow">Automated reaction discovery</span>
+  <h1 class="hero-title">AutoMeKin<span>-X</span></h1>
+  <p>Discover reaction mechanisms automatically. Transition states are located with molecular dynamics and graph theory, refined with quantum chemistry or machine-learning potentials, and connected into a reaction network whose kinetics is solved with Monte Carlo simulations. All you need is a starting structure in XYZ format.</p>
+  <div class="hero-actions">
+    <a class="btn-amk btn-amk-primary" href="docs/installation.html">Get started</a>
+    <a class="btn-amk btn-amk-secondary" href="docs/beginners.html">Beginners tutorial</a>
+  </div>
+</div>
 
 <div class="feature-grid">
-  <a class="feature-card" href="#mm">
-    <div class="feature-card-icon">⚙️</div>
-    <h3>Install AutoMeKin</h3>
-    <p>micromamba, build from source, or a Singularity container.</p>
+  <a class="feature-card" href="docs/installation.html">
+    <div class="feature-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></div>
+    <h3>Installation</h3>
+    <p>Build from source with the standard GNU toolchain.</p>
+  </a>
+  <a class="feature-card" href="docs/engines.html">
+    <div class="feature-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg></div>
+    <h3>Engines</h3>
+    <p>MOPAC, Qcore, Gaussian, ORCA and ML potentials.</p>
   </a>
   <a class="feature-card" href="docs/mlip.html">
-    <div class="feature-card-icon">🤖</div>
-    <h3>ML Potentials</h3>
-    <p>Use UMA or MACE for high-level refinement — no QM code required.</p>
+    <div class="feature-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="12" cy="12" r="2"/><path d="M7 12h3M14 11l3.5-4.5M14 13l3.5 4.5"/></svg></div>
+    <h3>ML potentials</h3>
+    <p>UMA or MACE for high-level refinement, with no QM code required.</p>
   </a>
-  <a class="feature-card" href="docs/tutorial.html">
-    <div class="feature-card-icon">📘</div>
+  <a class="feature-card" href="docs/beginners.html">
+    <div class="feature-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></div>
     <h3>Tutorial</h3>
-    <p>Step-by-step guide to input files, workflows, and analysis.</p>
-  </a>
-  <a class="feature-card" href="https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb">
-    <div class="feature-card-icon">🚀</div>
-    <h3>Try it in Colab</h3>
-    <p>No installation needed — run a live example in your browser.</p>
+    <p>From installation to your first reaction network, step by step.</p>
   </a>
 </div>
 
-# 🚀Quick Start 
+## Quick start
 
+1. **Install** AutoMeKin-X from source following [Installation](docs/installation.html),
+   or the more detailed [Installation from zero](docs/beginners_install.html).
+2. **Run the tests** to check that everything works: [Running the tests](docs/tests.html).
+3. **Prepare your input**: an XYZ file and a `.dat` input file, described in
+   [Input files](docs/input.html).
+4. **Launch the workflows** with `llcalcs.sh` and `hlcalcs.sh`:
+   [Automated workflows](docs/running.html).
 
-If you're eager to experience it firsthand, you can try this Notebook:    
-
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb)
-
-# Installation of AutoMeKin
-**AutoMeKin** offers four different installation and deployment methods: 
-1. [Build with `micromamba` $\scriptstyle($recommended option$\scriptstyle)$](#mm)
-2. [Build from source](#build)
-3. [Singularity container](#singularity)
-
-## 1. Build with `micromamba` <a name="mm"></a>
-This is the recommended option. The packages `git` and `curl` must be installed beforehand.
-
-First, clone the repository:
-
-```
-git clone https://github.com/ComputationalChem-USC/AutoMeKin-X.git
-```
-
-Go to the AutoMeKin directory:
-
-```
-cd AutoMeKin
-```
-
-To build `AutoMeKin` and its dependencies (including [`amk_tools`](https://github.com/dgarayr/amk_tools), `qcore` and `molden`) within a `micromamba` environment named `amk_env`, just type:
-
-```
-bash Build_micromamba.sh
-```
-
-{: .highlight }    
-`Build_micromamba.sh` should be run only when installing a new version or using the code for the first time.   
-Once the environment is successfully created, you must activate it and load the `AutoMeKin` module. These four instructions will be displayed once the build process is complete. For convenience, you can copy them into a file for future use.
-
-Before using `qcore` for the first time, remember to agree to the Software License Agreement and to set your token by running:
-
-```
-entos --license
-```
-
-
-
-
-## 2. Build from source <a name="build"></a>
-
-The most recent version is available at GitHub and can be installed as indicated in this section.
-
-You can build, system-wide and including dependencies, following the steps indicated in these scripts: 
-- [CentOS-based script](https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/main/Build_Centos.sh)
-- [Ubuntu-based script](https://raw.githubusercontent.com/ComputationalChem-USC/AutoMeKin-X/main/Build_Ubuntu.sh)
-
-
-To install everything manually, follow the next steps.
-
-### Installing dependencies 
-
-{: .highlight }    
-The following **packages** are required beforehand:   
-[GNU Autoconf](https://www.gnu.org/software/autoconf/), [GNU Bash](https://www.gnu.org/software/bash/), [GNU bc](https://www.gnu.org/software/bc/), [environment-modules](https://github.com/cea-hpc/modules), [GNU Awk, gawk](https://www.gnu.org/software/gawk/), [GNU C Compiler, gcc](https://gcc.gnu.org/), [GNU Fortran Compiler, gfortran](https://gcc.gnu.org/wiki/GFortran), [GNU Parallel](https://www.gnu.org/software/bash/manual/html_node/GNU-Parallel.html), [SQLite\>= 3](https://www.sqlite.org/index.html)   
-The installation of [molden](https://www.theochem.ru.nl/molden/linux.html) is highly recommended to analyze the results.
-
-Additionally,
-
-{: .highlight }    
-The following **Python3 libraries** are
-needed:  
-[ASE](https://wiki.fysik.dtu.dk/ase/install.html), [Matplotlib](https://matplotlib.org/stable/users/installing/index.html), [NetworkX](https://networkx.org/documentation/stable/install.html), [NumPy](https://numpy.org/install/), [SciPy](https://scipy.org/install/), [joblib](https://joblib.readthedocs.io/), [amk_tools](https://github.com/dgarayr/amk_tools)
-
-{: .highlight }
-If you plan to use the **MLIP** backend (`HighLevel mlip uma` or `mace`; see [Using ML potentials](docs/mlip.html)), you additionally need:  
-[PyTorch](https://pytorch.org/get-started/locally/) (2.7 or newer recommended), [Sella](https://github.com/zadorlab/sella), [MACE](https://github.com/ACEsuit/mace) (`mace-torch` on PyPI), [fairchem-core](https://github.com/facebookresearch/fairchem) (for UMA), [OmegaConf](https://omegaconf.readthedocs.io/)
-
-
-### Installing AutoMeKin
-
-Once the above packages are installed, you can now install AutoMeKin
-following these steps:
 ```bash
 git clone https://github.com/ComputationalChem-USC/AutoMeKin-X.git
-```
-```bash
-cd AutoMeKin
-```
-```bash
+cd AutoMeKin-X
 autoreconf -i
-```
-```bash
 ./configure --prefix=path_to_program
-```
-Where you can specify where you want to install it, _e.g._, `/opt/AutoMeKin`{: .language-bash .highlight}
-```bash
-make 
-```
-```bash
+make
 make install
 ```
-For convenience, and once “Environment Modules” has been installed, you
-should add the following line to your `.bashrc` file:
-```bash
-module use path_to_program/modules
-```
-where `path_to_program` is the path where you installed amk (_e.g._,
-`$HOME/amk-2021`{: .language-bash .highlight}).
 
-
-### Installing other electronic structure packages
-
-While mopac comes with the distribution, [gaussian](https://gaussian.com/) and/or [Entos Qcore](https://software.entos.ai/qcore/documentation/) should be installed by the user.
-
-{: .highlight }   
-Entos Qcore, which is free for academia, can be easily installed following these steps.
-This is the path for someone who followed the
-[beginners tutorial](docs/beginners_install.html) (a plain `conda create -n amk_env
-python=3.11` environment, without qcore bundled in) and now wants to add qcore on top
-of that same `amk_env`, without breaking it in the process:
-
-1. Install [miniconda](https://docs.conda.io/projects/miniconda/en/latest/)
-2. Add the following line to `$HOME/.condarc`{: .language-bash .highlight}, creating the file if not present:
-```bash
-auto_activate_base: false
-```
-which avoids activation of base environment.   
-3. Install qcore version 0.8.14 in the conda environment qcore-0.8.14-env:
-```bash
-conda create -n qcore-0.8.14-env -c entos -c conda-forge qcore==0.8.14 'tbb<2021'
-```
-4. Activate the newly created environment and, since each user will be asked to read the
-Software License Agreement to generate a unique token, do so now:
-```bash
-conda activate qcore-0.8.14-env
-qcore --academic-license
-conda deactivate
-```
-
-{: .important }
-**Don't leave `qcore-0.8.14-env` activated when you actually run AutoMeKin.**
-`conda activate` puts that environment's own Python (and its `tbb`/`mkl` build) ahead of
-everything else on your `PATH`. If it's still active when you launch `amk.sh`/`hlcalcs.sh`,
-it will shadow the Python your AutoMeKin environment needs (`ase`, `numpy`, etc.), which can
-break scripts like `createMat.py` with confusing import errors that have nothing to do with
-qcore itself.
-
-5. Instead, make `qcore` reachable from your normal AutoMeKin environment with a small
-wrapper script, placed on its `PATH` next to the other AutoMeKin executables (e.g. in
-`$AMK/bin`):
-```bash
-cat > $AMK/bin/qcore << 'EOF'
-#!/bin/bash
-exec /path/to/miniconda3/envs/qcore-0.8.14-env/bin/qcore "$@"
-EOF
-chmod +x $AMK/bin/qcore
-```
-Replace `/path/to/miniconda3` with wherever miniconda was installed. From then on, `qcore`
-behaves like a normal command in your AutoMeKin environment (`HighLevel qcore ...` in your
-input file works as expected) without ever activating `qcore-0.8.14-env` again.
-
-### Installing `amk_tools`
-
-Installing`amk_tools` is strongly recommended for result analysis. 
-
-You can install this Python package by following the instructions provided [here](https://github.com/dgarayr/amk_tools)
-
-## 3. Singularity container <a name="singularity"></a>
-If singularity is already installed in your
-computer, you can obtain the container from sylabs. First check the
-latest image, Tag, by typing: 
-
-```bash
-singularity search automekin
-```
-
-and replace `<Tag>` below by that number.
-Then, from your `$HOME` type: 
-
-```bash
-singularity pull library://emartineznunez/default/automekin:<Tag>
-```
-
-You can start an instance of the container and run it using:
-
-```bash
-singularity instance start automekin_<Tag>.sif automekin
-```
-```bash
-singularity run instance://automekin
-```
-
-which will allow you to run low-level scripts. You can stop the instance
-using:
-
-```bash
-singularity instance stop automekin
-```
-
-Note, however, that if you want to use G09/G16 you must bind it to the
-container. To help you do so, we created the scripts `SingularitygXX.sh`
-(replace `XX` with 09 or 16), which can be downloaded as:
-```bash
-curl -LJO https://github.com/emartineznunez/Singularity_amk/raw/main/SingularitygXX.sh
-```
-The script should be run with the complete path to the sif file as
-argument as in the example:
-```bash
-SingularitygXX.sh $HOME/automekin_<Tag>.sif
-```
-Note that `SingularitygXX.sh` will start a new instance of the container
-every time it is executed. To list the instances use:
-```bash
-singularity instance list
-```
-
-## Using ML potentials (UMA / MACE) <a name="mlip-repos"></a>
-
-AutoMeKin only calls into these models through `mlip_calc.py`; it does not document their own installation or usage. For specifications on installing and using UMA and MACE themselves, visit their respective repositories: [UMA (fairchem)](https://github.com/facebookresearch/fairchem) and [MACE](https://github.com/ACEsuit/mace). See [Using ML potentials (MLIP)](docs/mlip.html) for how to configure AutoMeKin to use them.
+{: .highlight }
+If you are new to AutoMeKin, start with the [complete tutorial for beginners](docs/beginners.html),
+also available as a [PDF]({{ "/assets/files/AutoMeKin-Beginners-Tutorial.pdf" | relative_url }}).

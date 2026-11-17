@@ -1,0 +1,41 @@
+// AutoMeKin-X color scheme: white, black and blue.
+// Dark mode: navy / graphite surfaces, light text, brand blue accents.
+$color-scheme: dark;
+
+$amk-page: #0b1220;     // page background
+$amk-side: #0f172a;     // sidebar
+$amk-surface: #111a2e;  // cards, tables, search box
+$amk-line: #1e293b;     // borders
+$amk-text: #e2e8f0;     // body text
+$amk-muted: #94a3b8;    // secondary text
+$amk-blue: #3b82f6;     // links and accents
+$amk-code: #0d1117;     // code blocks (near-black)
+
+$body-background-color: $amk-page;
+$body-heading-color: #ffffff;
+$body-text-color: $amk-text;
+$link-color: $amk-blue;
+$nav-child-link-color: $amk-muted;
+$sidebar-color: $amk-side;
+$base-button-color: $amk-surface;
+$btn-primary-color: $amk-blue;
+$code-background-color: $amk-code;
+$code-linenumber-color: #8b949e;
+$feedback-color: $amk-side;
+$table-background-color: $amk-surface;
+$search-background-color: $amk-surface;
+$search-result-preview-color: $amk-muted;
+$border-color: $amk-line;
+
+$body-font-family: "Inter", system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", roboto, "Helvetica Neue", arial, sans-serif;
+$mono-font-family: "JetBrains Mono", "SFMono-Regular", menlo, consolas, monospace;
+
+@import "./vendor/OneDarkJekyll/syntax";
+
+// Match the syntax theme background to the near-black code blocks
+.highlight,
+pre.highlight,
+.highlight pre,
+.highlight .hll {
+  background: $amk-code;
+}

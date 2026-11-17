@@ -46,9 +46,8 @@ you're in).
 ## Prerequisites <a name="prerequisites"></a>
 
 - **Operating system:** Debian/Ubuntu-based Linux (this page uses
-  Ubuntu 22.04 LTS). Build scripts also exist for CentOS/RHEL, and
-  there's an alternative Singularity (container) method if you can't
-  compile on your own machine.
+  Ubuntu 22.04 LTS). Other Linux distributions work as well, as long as
+  the equivalent system packages are installed.
 - **Disk space:** at least 3-4 GB free for the basic installation
   (source code + Python dependencies + build artifacts). If you're also
   going to use the high-level backends from [Step 7](#step-7) (ORCA

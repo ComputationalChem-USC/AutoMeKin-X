@@ -1,9 +1,9 @@
-title: AutoMeKin Documentation
-description: Documentation for AutoMeKin
+title: AutoMeKin-X
+description: Documentation for AutoMeKin-X, automated reaction discovery
 theme: just-the-docs
 
 aux_links:
-  AutoMeKin's Repository: https://github.com/ComputationalChem-USC/AutoMeKin-X
+  GitHub: https://github.com/ComputationalChem-USC/AutoMeKin-X
 
 # External navigation links
 nav_external_links:
@@ -18,15 +18,15 @@ nav_external_links:
 back_to_top: true
 back_to_top_text: "Back to top"
 
-footer_content: "Copyright &copy; 2025 Emilio Martinez-Nunez"
+footer_content: "Copyright &copy; 2026 Emilio Martinez-Nunez"
 
 # Color scheme currently only supports "dark", "light"/nil (default), or a custom scheme that you define
-color_scheme: modern
+color_scheme: automekin
     
 callouts_level: quiet # or loud
 callouts:
   highlight:
-    color: yellow
+    color: blue
   important:
     color: blue
   new:
@@ -34,7 +34,7 @@ callouts:
     color: green
   note:
     title: Note
-    color: purple
+    color: grey-dk
   warning:
     title: Warning
     color: red

@@ -1,7 +1,7 @@
 ---
 title: Using ML potentials (MLIP)
 layout: home
-nav_order: 3.5
+nav_order: 4
 ---
 
 # Using ML potentials (MLIP)
@@ -31,7 +31,9 @@ When `HighLevel mlip <model>` is set in the input file (with `<model>` = `uma` o
 **Supported MLIP models:**
 - `uma` — Meta FAIR UMA-M model (`uma-m-1p1.pt`, optionally paired with `uma-m-1p1_atom_refs.yaml` for atomic reference energies)
 - `mace` — MACE-omol-0-extra-large-1024 model (`MACE-omol-0-extra-large-1024.model`)
-- `delta` — delta-ML correction on top of ORCA r2SCAN-3c HL energies (`HighLevel orca r2scan-3c delta`), per [Rodriguez-Lopez et al., Small Structures 2026, 7, e70504](https://onlinelibrary.wiley.com/doi/10.1002/sstr.70504). For more information on how to use it, see [AMK-ML-corrections-BH](https://github.com/ComputationalChem-USC/AMK-ML-corrections-BH).
+
+{: .note }
+Looking for the delta-ML correction of r2SCAN-3c energies? That is an ORCA option (`HighLevel orca r2scan-3c delta`), described in [Engines](engines.html#delta).
 
 Model files are **not** bundled in this repository. They must be placed in `$AMK/models/` (the `models` subdirectory of your AutoMeKin installation prefix, `$AMK`) — this path is fixed and is not configurable from the input file. See [Using MLIP in the input file](#howto) below for the exact steps.
 
@@ -98,5 +100,7 @@ That's it — no other keyword changes are needed. Everything else (`LowLevel`, 
 - `IRCpoints` defaults to 100 for `mlip` if not set explicitly.
 - For UMA, the optional `uma-m-1p1_atom_refs.yaml` is recommended alongside `uma-m-1p1.pt`: it supplies atomic reference energies used for isolated-atom/single-atom-fragment energies (e.g. barrierless dissociation products); without it those energies can be inaccurate.
 - Final results are collected in `FINAL_ML_<molecule>/` instead of the `FINAL_HL_<molecule>/` used by QM backends.
+- Without a GPU, the number of CPU worker processes follows the `runningtasks` value given to `hlcalcs.sh`, but it is capped by the available RAM, because each worker loads its own copy of the model (peak usage of about 24 GB per worker for UMA and 2 GB for MACE).
+- MLIP can also be used at the low level for TS optimizations, IRCs and minima (`LowLevel_TSopt mlip <model>`, `LowLevel_IRC mlip <model>`); see [Advanced options](other.html#adv).
 - GPU selection has no dedicated AutoMeKin keyword; to restrict which GPU(s) are visible, `export CUDA_VISIBLE_DEVICES=...` in the shell/job script before launching the run.
 - `HL_rxn_network` and the other screening/kinetics keywords behave the same as with QM backends; only the HL refinement engine changes.

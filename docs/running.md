@@ -1,7 +1,7 @@
 ---
 title: Automated workflows
 layout: home
-nav_order: 3
+nav_order: 6
 ---
 
 # Automated workflows
@@ -23,12 +23,15 @@ where:
 <code>niter</code> is the number of iterations  
 <code>runningtasks</code> is the number of simultaneous parallel tasks   
 
+{: .note }
+For molecules with many rotatable bonds, the torsional scan of each iteration can be split among several tasks with the keyword [`ntorstasks`](other.html#dihed).
+
 Finally, all high-level calculations can be accomplished using `hlcalcs.sh`:
 ```bash
 nohup hlcalcs.sh molecule.dat runningtasks >hlcalcs.log 2>&1 &
 ```
 
-The `llcalcsh.sh` and `hlcalcs.sh` scripts can also be run using a Slurm job scheduler and the following scripts are examples:
+The `llcalcs.sh` and `hlcalcs.sh` scripts can also be run using a Slurm job scheduler and the following scripts are examples:
 ```bash
 #!/bin/bash
 ntasks=20
@@ -50,6 +53,6 @@ sbatch --output=hlcalcs.log --error=hlcalcs.err -n $ntasks -c $ncores --mem-per-
 
 
 {: .note }   
-Details about the workflows involved in `llcals.sh` and `hlcalcs.sh` can be looked up in [this section](https://computationalchem-usc.github.io/AutoMeKin-X/docs/scripts.html).  
+Details about the workflows involved in `llcalcs.sh` and `hlcalcs.sh` can be looked up in [this section](https://computationalchem-usc.github.io/AutoMeKin-X/docs/scripts.html).  
 
 If something goes wrong, you might want to have a look [at this section](https://computationalchem-usc.github.io/AutoMeKin-X/docs/scripts.html#abort) describing how to stop the calculations.

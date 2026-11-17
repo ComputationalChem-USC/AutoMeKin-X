@@ -1,7 +1,7 @@
 ---
 title: Other capabilities
 layout: home
-nav_order: 5
+nav_order: 8
 ---
 
 # Other capabilities
@@ -129,6 +129,20 @@ torsion  no
 ```
 The default value for `torsion` is `yes`.
 
+When there are many rotatable bonds, or the number of minima grows quickly, the torsional scan of each iteration can become a bottleneck, since by default it is done by a single task. The keyword `ntorstasks` splits it among several parallel tasks:
+
+{: .important }
+`ntorstasks value`
+[`value` is an integer; default value: `1`]
+`value` is the number of parallel tasks that share the torsional scan in each iteration of `llcalcs.sh`/`amk_parallel.sh`. The new minima are distributed round-robin among these tasks. With the default value, a single task scans all the dihedrals, as in previous versions.
+
+```
+--Method--
+sampling   MD
+ntraj      10
+ntorstasks 4
+```
+
 ## Fragmentation<a name="frag"></a>
 
 The fragmentation patterns and breakdown curves can be modelled using the script `amk_frag.sh`. This script provides a workflow to iteratively discover fragmentation pathways not only the parent molecule but also for the fragments resulting from the primary fragmentation. Usage:
@@ -195,14 +209,24 @@ calculations, then, the keyword should be removed while running the low-level co
 {: .important }  
 `LowLevel_TSopt values`  
 [two `values`: two strings; no blank spaces in each string; default values: `mopac value[LowLevel]`]   
-First `value` is the program and second value is the electronic structure level employed to optimize the TSs at the low-level stage. _This keyword is employed if you want to use g09/g16 for the low-level TS
-optimizations, as shown in the example below but take into account that it is very CPU-time consuming_.
-Besides the TSs, the starting minimum in `name.xyz` is also optimized at this level of theory. 
+First `value` is the program (`mopac`, `qcore`, `g09`, `g16`, `orca` or `mlip`) and second value is the electronic structure level employed to optimize the TSs at the low-level stage, or the model name (`uma` or `mace`) for `mlip`. _This keyword is employed if you want to use an ab initio/DFT method or an ML potential for the low-level TS
+optimizations, as shown in the examples below, but take into account that ab initio/DFT optimizations are very CPU-time consuming_.
+Besides the TSs, the starting minimum in `name.xyz` is also optimized at this level of theory. With `mlip`, the TS optimizations are carried out with [Sella](https://github.com/zadorlab/sella).
 
-Example:
+Examples:
 ```
 LowLevel_TSopt g09 hf/3-21g
+LowLevel_TSopt mlip uma
 ```
+
+{: .important }
+`LowLevel_IRC values`
+[two `values`: two strings; default value: the program of `LowLevel_TSopt`]
+Program and model employed for the low-level IRC calculations and minima optimizations, once the TSs have been located. At present, the only alternative to the default is `mlip`, followed by the model name:
+```
+LowLevel_IRC mlip uma
+```
+Only one ML model is used for the whole low-level workflow: if several low-level keywords use `mlip`, the model given in the most specific one (`LowLevel_IRC`, then `LowLevel_TSopt`) is employed.
 
 {: .important }   
 `recalc value`   
