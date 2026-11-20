@@ -3,16 +3,52 @@ description: Documentation for AutoMeKin-X, automated reaction discovery
 theme: just-the-docs
 
 aux_links:
-  GitHub: https://github.com/ComputationalChem-USC/AutoMeKin-X
+  "GitHub":
+    - "https://github.com/ComputationalChem-USC/AutoMeKin-X"
+  "Colab":
+    - "https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb"
+  "Web app":
+    - "https://rxnkin.usc.es/amk/"
+  "amk_tools_X":
+    - "https://github.com/OmarRodriguezLopez1398/amk_tools_X"
+aux_links_new_tab: true
 
-# External navigation links
-nav_external_links:
-  - title: Network visualization tools
-    url: https://github.com/dgarayr/amk_tools
-  - title: Try it on the Web
-    url: https://rxnkin.usc.es/amk/
-  - title: Open in Colab
-    url: https://colab.research.google.com/github/ComputationalChem-USC/AutoMeKin-X/blob/main/notebooks/AutoMeKin.ipynb
+# Copy button on every code block
+enable_copy_code_button: true
+
+# "Edit this page on GitHub" link at the bottom of each page
+gh_edit_link: true
+gh_edit_link_text: "Edit this page on GitHub"
+gh_edit_repository: "https://github.com/ComputationalChem-USC/AutoMeKin-X"
+gh_edit_branch: "gh-pages"
+gh_edit_view_mode: "edit"
+
+# Documentation sections (each one is a Jekyll collection; pages keep their
+# old /docs/*.html addresses through the permalink in their front matter)
+collections:
+  getting_started:
+    output: true
+  user_guide:
+    output: true
+  engines:
+    output: true
+  advanced:
+    output: true
+  community:
+    output: true
+
+just_the_docs:
+  collections:
+    getting_started:
+      name: Getting started
+    user_guide:
+      name: User guide
+    engines:
+      name: Engines
+    advanced:
+      name: Advanced
+    community:
+      name: Community
 
 # Back to top link
 back_to_top: true

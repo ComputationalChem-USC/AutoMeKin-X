@@ -787,3 +787,1042 @@ html,
 .main-content-wrap footer .text-grey-dk-100 {
   color: $amk-muted !important;
 }
+
+
+// ===========================================================================
+// Redesign v2 (2026-11)
+// ===========================================================================
+
+// --- Phase 1: fixes -------------------------------------------------------
+
+// Heading anchor icons must not inherit the link underline (it showed as a
+// stray blue dash to the left of every heading)
+.main-content .anchor-heading {
+  border-bottom: 0 !important;
+}
+
+// Sidebar logo: transparent dark-mode version, no light plate
+.site-footer::before {
+  background: url("#{$baseurl}/assets/images/logo-dark-small.png") no-repeat left center / contain;
+  border-radius: 0;
+  width: 170px;
+  height: 80px;
+}
+
+// On phones the sidebar footer sits at the end of the page and the logo
+// overlapped the copyright line: hide it there
+@media (max-width: 49.99rem) {
+  .site-footer::before {
+    display: none;
+  }
+}
+
+// Header buttons: one icon per link (GitHub keeps the default mark)
+.aux-nav .aux-nav-list {
+  gap: 0.5rem;
+}
+
+.aux-nav .site-button {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.aux-nav .site-button[href*="colab"]::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 7.5a4.5 4.5 0 1 0 0 9'/%3E%3Cpath d='M14.5 7.5a4.5 4.5 0 1 1 0 9'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 7.5a4.5 4.5 0 1 0 0 9'/%3E%3Cpath d='M14.5 7.5a4.5 4.5 0 1 1 0 9'/%3E%3C/svg%3E");
+}
+
+.aux-nav .site-button[href*="rxnkin"]::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18'/%3E%3Cpath d='M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18'/%3E%3Cpath d='M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18'/%3E%3C/svg%3E");
+}
+
+.aux-nav .site-button[href*="amk_tools"]::before {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='19' cy='5' r='2'/%3E%3Ccircle cx='19' cy='19' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Cpath d='M7 12h3M14 11l3.5-4.5M14 13l3.5 4.5'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='5' cy='12' r='2'/%3E%3Ccircle cx='19' cy='5' r='2'/%3E%3Ccircle cx='19' cy='19' r='2'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3Cpath d='M7 12h3M14 11l3.5-4.5M14 13l3.5 4.5'/%3E%3C/svg%3E");
+}
+
+// Copy-code button: visible on the dark code blocks
+.main-content div.highlighter-rouge {
+  position: relative;
+}
+
+.main-content .highlight button,
+.main-content div.highlighter-rouge button {
+  color: $amk-muted;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid #263044;
+  border-radius: 6px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.main-content .highlight button:hover,
+.main-content div.highlighter-rouge button:hover {
+  color: #fff;
+  border-color: $amk-blue;
+}
+
+// "Edit this page on GitHub"
+.main-content-wrap footer .site-footer-edit,
+.main-content-wrap footer a[href*="/edit/"] {
+  color: #93c5fd;
+}
+
+// --- Phase 3: navigation and reading aids ---------------------------------
+
+// Section titles in the sidebar
+.side-bar .nav-category {
+  margin-top: 1.25rem;
+  padding: 0.6rem 1rem 0.4rem 2rem;
+  font-size: 0.72rem !important;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #60a5fa;
+  border-bottom: 0;
+}
+
+// The logo sits on its own band so nav items scroll behind it cleanly
+.site-footer {
+  background-color: $amk-sidebar;
+  border-top: 1px solid $amk-line;
+}
+
+// "On this page" index (wide screens only)
+.page-toc {
+  display: none;
+}
+
+@media (min-width: 85rem) {
+  .side-bar {
+    width: calc((100% - 80.5rem) / 2 + 16.5rem);
+  }
+
+  .main {
+    max-width: 64rem;
+    margin-left: Max(16.5rem, calc((100% - 80.5rem) / 2 + 16.5rem));
+  }
+
+  .has-page-toc .main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 13rem;
+    column-gap: 1rem;
+  }
+
+  .has-page-toc .main > .main-header {
+    grid-column: 1 / -1;
+  }
+
+  .has-page-toc .main > .main-content-wrap {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+  }
+
+  .page-toc {
+    display: block;
+    grid-column: 2;
+    grid-row: 2;
+    position: sticky;
+    top: 1.5rem;
+    align-self: start;
+    max-height: calc(100vh - 3rem);
+    overflow-y: auto;
+    margin-top: 2.5rem;
+    padding: 0 0.5rem 1rem 1rem;
+    border-left: 1px solid $amk-line;
+    font-size: 0.82rem;
+  }
+
+  .page-toc-title {
+    margin: 0 0 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: $amk-muted;
+  }
+
+  .page-toc ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .page-toc li {
+    margin: 0;
+    padding: 0;
+  }
+
+  .page-toc li::before {
+    content: none;
+  }
+
+  .page-toc a {
+    display: block;
+    padding: 0.25rem 0 0.25rem 0.6rem;
+    margin-left: -1rem;
+    border-left: 2px solid transparent;
+    color: $amk-muted;
+    line-height: 1.35;
+    text-decoration: none;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .page-toc .toc-h3 a {
+    padding-left: 1.4rem;
+    font-size: 0.78rem;
+  }
+
+  .page-toc a:hover {
+    color: #fff;
+  }
+
+  .page-toc a.active {
+    color: #93c5fd;
+    border-left-color: $amk-blue;
+  }
+}
+
+// Step cards (beginners tutorial overview)
+.step-cards {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.main-content a.step-card {
+  position: relative;
+  display: block;
+  padding: 1rem 1.25rem 1rem 4rem;
+  border: 1px solid $amk-line;
+  border-radius: 12px;
+  background: $amk-soft;
+  color: $amk-ink;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.main-content a.step-card:hover {
+  border-color: $amk-blue;
+  transform: translateX(3px);
+}
+
+.step-card .step-title {
+  display: block;
+  font-weight: 700;
+  margin: 0 0 0.25rem !important;
+  font-size: 1.05rem !important;
+  color: #fff;
+}
+
+.step-card p {
+  margin: 0;
+  font-size: 0.92rem;
+  color: $amk-muted;
+}
+
+.step-num {
+  position: absolute;
+  left: 1.1rem;
+  top: 1rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+// Reveal on scroll (used on the home page)
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+// Tabs
+.amk-tabs [role=tablist] {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid $amk-line;
+  margin-bottom: 0.75rem;
+}
+
+.amk-tabs [role=tab] {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0.5rem 0.9rem;
+  color: $amk-muted;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.amk-tabs [role=tab][aria-selected=true] {
+  color: #fff;
+  border-bottom-color: $amk-blue;
+}
+
+.amk-tabs [role=tab]:hover {
+  color: #fff;
+}
+
+// Publications page
+.pub-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  height: 180px;
+  margin: 1.5rem 0 1rem;
+  padding: 1rem 1rem 0;
+  border: 1px solid $amk-line;
+  border-radius: 12px;
+  background: $amk-soft;
+}
+
+.pub-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.pub-bar {
+  display: block;
+  width: 100%;
+  max-width: 56px;
+  min-height: 4px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, #60a5fa, #1d4ed8);
+}
+
+.pub-bar-value {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #93c5fd;
+  margin-bottom: 0.25rem;
+}
+
+.pub-bar-year {
+  padding: 0.4rem 0;
+  font-size: 0.8rem;
+  color: $amk-muted;
+}
+
+.pub-filter input {
+  width: 100%;
+  max-width: 22rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid $amk-line;
+  border-radius: 8px;
+  background: $amk-soft;
+  color: $amk-ink;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.pub-filter input:focus {
+  outline: none;
+  border-color: $amk-blue;
+}
+
+.pub-count {
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  font-size: 0.8rem;
+  vertical-align: middle;
+}
+
+.pub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: 0.6rem;
+}
+
+.main-content a.pub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid $amk-line;
+  border-radius: 10px;
+  background: $amk-soft;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.main-content a.pub-card:hover {
+  border-color: $amk-blue;
+  transform: translateY(-2px);
+}
+
+.pub-journal {
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+
+.pub-title {
+  color: $amk-ink;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.pub-meta {
+  color: $amk-muted;
+  font-size: 0.78rem;
+}
+
+.pub-card[hidden],
+.pub-grid[hidden],
+h2[hidden] {
+  display: none !important;
+}
+
+// Keyword reference
+.kw-tools {
+  margin: 1.25rem 0 1rem;
+}
+
+.kw-tools input {
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid $amk-line;
+  border-radius: 8px;
+  background: $amk-soft;
+  color: $amk-ink;
+  font: inherit;
+}
+
+.kw-tools input:focus {
+  outline: none;
+  border-color: $amk-blue;
+}
+
+.kw-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.kw-chip {
+  padding: 0.25rem 0.7rem;
+  border: 1px solid $amk-line;
+  border-radius: 999px;
+  background: transparent;
+  color: $amk-muted;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.kw-chip:hover {
+  color: #fff;
+  border-color: #334155;
+}
+
+.kw-chip.is-active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: $amk-blue;
+  color: #93c5fd;
+}
+
+.kw-table td {
+  font-size: 0.86rem;
+  vertical-align: top;
+}
+
+.kw-table td:first-child {
+  white-space: nowrap;
+}
+
+.kw-table tr[hidden] {
+  display: none;
+}
+
+// Keyword callouts are link targets: leave room under the header
+.main-content [id^="kw-"] {
+  scroll-margin-top: 1rem;
+}
+.main-content [id^="kw-"]:target {
+  box-shadow: 0 0 0 2px $amk-blue;
+}
+
+// ---------------------------------------------------------------------------
+// Landing page (index.md, .amk-landing)
+// ---------------------------------------------------------------------------
+$amk-green: #34d399;
+$amk-green-soft: rgba(52, 211, 153, 0.12);
+
+.amk-landing {
+  margin-top: 0.5rem;
+}
+
+.btn-amk-ghost {
+  background: transparent;
+  color: $amk-muted !important;
+  border: 1px solid transparent;
+}
+.btn-amk-ghost:hover { color: #fff !important; }
+.main-content a.btn-amk-ghost { border-bottom: 0; }
+
+button.btn-amk { cursor: pointer; font-family: inherit; }
+
+// Hero with an animated potential energy surface behind the text
+.landing-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid $amk-line;
+  border-radius: 16px;
+  background: radial-gradient(900px 420px at 85% 30%, rgba(59, 130, 246, 0.22), transparent 65%), #070d1a;
+  padding: 3.5rem 2.5rem;
+  min-height: 360px;
+  display: flex;
+  align-items: center;
+}
+
+.pes-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.landing-hero-text {
+  position: relative;
+  max-width: 34rem;
+}
+
+.landing-hero-text::before {
+  // keeps the text readable when the surface passes behind it
+  content: "";
+  position: absolute;
+  inset: -2rem -3rem -2rem -2.5rem;
+  background: radial-gradient(closest-side, rgba(7, 13, 26, 0.85), transparent);
+  z-index: -1;
+}
+
+.main-content h1.landing-title {
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin: 0.4rem 0 1rem;
+  color: #fff;
+}
+.main-content h1.landing-title span { color: $amk-blue-dark; }
+.main-content h1.landing-title .anchor-heading { display: none; }
+
+.landing-lead {
+  font-size: 1.08rem;
+  line-height: 1.6;
+  color: $amk-ink;
+  margin-bottom: 1.6rem;
+}
+
+.amk-landing .hero-eyebrow {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $amk-blue-dark;
+  background: $amk-blue-soft;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+}
+
+.amk-landing .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+// Numbers strip
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  margin: 1.5rem 0 0;
+  border: 1px solid $amk-line;
+  border-radius: 12px;
+  overflow: hidden;
+  background: $amk-line;
+}
+.stat {
+  background: $amk-soft;
+  padding: 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-label { font-size: 0.85rem; color: $amk-muted; line-height: 1.35; }
+
+// Sections
+.landing-section { margin-top: 4rem; }
+.main-content h2.landing-h2 {
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  border: 0;
+}
+.landing-sub { color: $amk-muted; max-width: 46rem; margin-top: 0; }
+
+// Animated workflow diagram
+.flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  align-items: start;
+}
+
+.flow-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+
+.flow-panel {
+  position: relative;
+  border-radius: 14px;
+  padding: 1.6rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.flow-panel-pes { border: 1px solid rgba(96, 165, 250, 0.45); background: rgba(59, 130, 246, 0.07); }
+.flow-panel-refine { border: 1px solid rgba(52, 211, 153, 0.45); background: $amk-green-soft; }
+
+.flow-panel-title {
+  position: absolute;
+  top: -0.7rem;
+  left: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: $amk-page;
+}
+.flow-panel-pes .flow-panel-title { color: $amk-blue-dark; border: 1px solid rgba(96, 165, 250, 0.45); }
+.flow-panel-refine .flow-panel-title { color: $amk-green; border: 1px solid rgba(52, 211, 153, 0.45); }
+
+.flow-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.flow-row-3 { grid-template-columns: repeat(3, 1fr); }
+
+.flow-node {
+  position: relative;
+  border: 1px solid $amk-line;
+  background: $amk-soft;
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #fff;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.25s, box-shadow 0.25s, transform 0.25s, background-color 0.25s;
+}
+.flow-node small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.76rem;
+  color: $amk-muted;
+  margin-top: 0.1rem;
+}
+.flow-node:hover { border-color: rgba(96, 165, 250, 0.6); }
+.flow-node.is-active {
+  border-color: $amk-blue-dark;
+  background: #13244a;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25), 0 8px 24px rgba(59, 130, 246, 0.25);
+  transform: translateY(-1px);
+}
+.flow-panel-refine .flow-node.is-active {
+  border-color: $amk-green;
+  background: #0f2e2a;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.22), 0 8px 24px rgba(52, 211, 153, 0.2);
+}
+.flow-node.is-done { border-color: rgba(96, 165, 250, 0.35); }
+.flow-panel-refine .flow-node.is-done { border-color: rgba(52, 211, 153, 0.35); }
+
+.flow-chip { font-size: 0.85rem; padding: 0.4rem 0.6rem; border-radius: 999px; }
+.flow-chip-ml { border-style: dashed; }
+
+.flow-input { align-self: center; padding: 0.5rem 1.4rem; border-radius: 999px; }
+.flow-final { background: #0f2e2a; border-color: rgba(52, 211, 153, 0.45); }
+
+// Steps inside a panel are joined by short arrows
+.flow-loop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-right: 2.2rem;
+}
+.flow-loop > .flow-node:not(:last-of-type)::after,
+.flow-panel-refine > .flow-node:not(:last-child)::after,
+.flow-input::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.55rem;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid rgba(148, 163, 184, 0.6);
+}
+.flow-input::after { bottom: -0.65rem; }
+
+// Return arrow of the iterative loop, drawn on the right of the steps
+.flow-loop::before {
+  content: "";
+  position: absolute;
+  right: 0.6rem;
+  top: 1.1rem;
+  bottom: 1.1rem;
+  width: 1.1rem;
+  border: 2px dashed rgba(96, 165, 250, 0.55);
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+}
+.flow-loop-label {
+  position: absolute;
+  right: -0.4rem;
+  top: 50%;
+  transform: translateY(-50%) rotate(180deg);
+  writing-mode: vertical-rl;
+  font-size: 0.72rem;
+  color: $amk-blue-dark;
+  background: rgba(11, 18, 32, 0.95);
+  padding: 0.3rem 0.1rem;
+  white-space: nowrap;
+}
+
+.flow-decision {
+  align-self: center;
+  width: 9rem;
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(251, 191, 36, 0.08);
+  clip-path: polygon(8% 0, 92% 0, 100% 50%, 92% 100%, 8% 100%, 0 50%);
+  border-radius: 0;
+}
+.flow-decision.is-active {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.2);
+  box-shadow: none;
+}
+
+.flow-yes {
+  align-self: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: $amk-green;
+  position: relative;
+  padding: 0.1rem 0 0.4rem;
+}
+.flow-yes::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -0.2rem;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid $amk-green;
+}
+
+// Viewer that shows the picture of the active step
+.flow-viewer {
+  position: sticky;
+  top: 1.5rem;
+  border: 1px solid $amk-line;
+  border-radius: 14px;
+  background: $amk-soft;
+  min-height: 420px;
+  overflow: hidden;
+}
+.flow-slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1.2rem;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease, visibility 0.4s;
+}
+.flow-slide.is-active { opacity: 1; visibility: visible; transform: none; position: relative; }
+.flow-slide img {
+  flex: 1;
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: 10px;
+  margin: 0 auto;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.main-content .flow-slide img.on-light,
+.main-content .gallery img,
+.main-content .demo-frame > img {
+  background: #fff;
+  padding: 0.6rem;
+}
+.flow-slide p { margin: 1rem 0 0; font-size: 0.95rem; line-height: 1.5; }
+.flow-slide p strong { color: #fff; }
+
+.flow-progress {
+  display: flex;
+  gap: 4px;
+  padding: 0 1.2rem 1rem;
+}
+.flow-progress span {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: $amk-line;
+  transition: background-color 0.3s;
+}
+.flow-progress span.is-on { background: $amk-blue; }
+
+.engine-cloud {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 260px;
+}
+.engine-cloud span {
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  background: $amk-green-soft;
+  color: #fff;
+  font-weight: 700;
+}
+.flow-slide.is-active .engine-cloud span { animation: amk-pop 0.5s both; }
+.engine-cloud span:nth-child(2) { animation-delay: 0.08s !important; }
+.engine-cloud span:nth-child(3) { animation-delay: 0.16s !important; }
+.engine-cloud span:nth-child(4) { animation-delay: 0.24s !important; }
+.engine-cloud span:nth-child(5) { animation-delay: 0.32s !important; }
+.engine-cloud span:nth-child(6) { animation-delay: 0.40s !important; }
+@keyframes amk-pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
+
+.flow-more { margin-top: 1rem; font-size: 0.92rem; }
+
+// Interactive demo
+.demo-frame {
+  position: relative;
+  margin-top: 1.2rem;
+  border: 1px solid $amk-line;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  height: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.main-content .demo-frame > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: saturate(0.85) brightness(0.85);
+  border: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0;
+}
+.demo-launch {
+  position: absolute;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-size: 1.05rem;
+  padding: 0.8rem 1.5rem;
+}
+.demo-frame iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.demo-note { font-size: 0.85rem; color: $amk-muted; margin-top: 0.6rem; }
+
+// Results gallery
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1.2rem;
+}
+.gallery figure {
+  margin: 0;
+  border: 1px solid $amk-line;
+  border-radius: 12px;
+  background: $amk-soft;
+  overflow: hidden;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.gallery figure:hover { transform: translateY(-3px); border-color: rgba(96, 165, 250, 0.5); }
+.main-content .gallery img {
+  width: 100%;
+  height: 200px;
+  object-fit: contain;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+  margin: 0;
+}
+.gallery figcaption { padding: 0.8rem 1rem 1rem; font-size: 0.88rem; color: $amk-muted; }
+.gallery figcaption strong { color: #fff; }
+
+// News: cards on the home page, list on the news page
+.news-strip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 1.2rem;
+}
+.main-content a.news-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid $amk-line;
+  border-radius: 12px;
+  background: $amk-soft;
+  color: $amk-ink;
+  text-decoration: none;
+  border-bottom: 1px solid $amk-line;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.main-content a.news-card:hover { transform: translateY(-3px); border-color: rgba(96, 165, 250, 0.5); }
+.news-date {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: $amk-blue-dark;
+}
+.news-card .news-title { font-weight: 700; color: #fff; }
+.news-card .news-text { font-size: 0.88rem; color: $amk-muted; line-height: 1.45; }
+
+.news-list { margin-top: 1.5rem; border-left: 2px solid $amk-line; }
+.news-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 1rem;
+  padding: 0 0 1.6rem 1.4rem;
+}
+.news-item::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 0.25rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: $amk-blue;
+  box-shadow: 0 0 0 4px $amk-page;
+}
+.news-item .news-date { padding-top: 0.15rem; }
+.main-content .news-item p { margin: 0 0 0.3rem; }
+.news-item .news-title { font-weight: 700; color: #fff; font-size: 1.05rem; }
+.news-item .news-text { color: $amk-ink; }
+.news-link { font-size: 0.9rem; }
+
+// Tabs on the home page
+.amk-landing .amk-tabs {
+  margin-top: 1rem;
+  border: 1px solid $amk-line;
+  border-radius: 12px;
+  background: $amk-soft;
+  padding: 0.5rem 1.2rem 1rem;
+}
+.amk-landing .amk-tabs div.highlighter-rouge { margin: 0.75rem 0; }
+
+// Citation
+.cite-box {
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(52, 211, 153, 0.06));
+  padding: 1.6rem 1.6rem 1.2rem;
+  margin-bottom: 2rem;
+}
+#cite-main {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+  background: rgba(7, 13, 26, 0.6);
+  border: 1px solid $amk-line;
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  word-break: break-word;
+}
+.cite-box p:last-child { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+
+// Phones and narrow screens
+@media (max-width: 60rem) {
+  .flow { grid-template-columns: 1fr; }
+  .flow-viewer { position: relative; top: 0; min-height: 0; order: -1; }
+  .gallery, .news-strip { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 40rem) {
+  .landing-hero { padding: 2.2rem 1.2rem; min-height: 0; }
+  .demo-frame { height: 380px; }
+  .flow-row-3 { grid-template-columns: 1fr; }
+  .news-item { grid-template-columns: 1fr; gap: 0.2rem; }
+  .stat-value { font-size: 1.6rem; }
+}
+
+// With five nav sections the sidebar is long: keep its footer compact so the
+// menu has room, and drop the logo on short screens
+.site-footer::before {
+  width: 130px;
+  height: 56px;
+}
+@media (max-height: 56rem) {
+  .side-bar .site-footer::before { display: none; }
+}
+.flow-viewer { top: 5rem; }
+@media (max-width: 40rem) {
+  .pes-canvas { opacity: 0.45; }
+}

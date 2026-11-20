@@ -1,0 +1,35 @@
+---
+title: Kinetics section
+layout: home
+nav_order: 4
+parent: Input files
+permalink: /docs/kinetics.html
+---
+# Kinetics section
+
+This part is employed to provide details for the kinetics calculations at the $\scriptstyle{(}$experimental$\scriptstyle{)}$
+conditions you want to simulate. _This section is compulsory except for association_.
+
+An example is given as follows.
+```
+--Kinetics--
+Energy 150
+```
+The kinetics simulations will be carried out for a canonical, fixed temperature, or microcanonical, fixed
+energy, ensemble, which have their associated keywords:
+
+List of `Keyword value(s)` for this section:
+
+{: .important #kw-energy }
+`Energy value`   
+[`value` is an integer; default value: `0` ]   
+`value` is the energy in kcal/mol for which microcanonical rate coefficients will be calculated.
+
+{: .warning }  
+Be careful, as the value of energy is crucial; it determines the maximum energy of the transition states in high-level calculations.
+
+{: .important #kw-temperature }
+`Temperature value`   
+[`value` is an integer; default value: `298`]   
+`value` is the temperature in K for which thermal rate coefficients will be calculated. At present, only
+temperatures in the range 100 - 9999 K are allowed.
