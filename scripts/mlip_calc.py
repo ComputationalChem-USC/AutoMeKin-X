@@ -76,6 +76,9 @@ logging.getLogger().setLevel(logging.ERROR)
 warnings.filterwarnings('ignore', message="Can't initialize NVML")
 warnings.filterwarnings('ignore', category=FutureWarning, module='ase.optimize.optimize')
 warnings.filterwarnings('ignore', message=r".*weights_only.*")
+# e3nn/mace call torch.jit.script/torch.jit.load when the model is loaded; recent
+# torch flags them as deprecated (FutureWarning), which only clutters the logs.
+warnings.filterwarnings('ignore', category=FutureWarning, message=r"`torch\.jit\.\w+` is deprecated")
 
 # IRC parameters
 IRC_DX    = 0.08   # amu^0.5 * Å, step size along IRC
