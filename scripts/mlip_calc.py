@@ -49,6 +49,12 @@ start-up):
       For uma on GPU the server uses faster inference settings (see
       load_calculator(fast=True)); set AMK_MLIP_FAST=0 to disable.
 
+Product energies (called by rxn_network.sh after irc_analysis.sh when IRC is mlip):
+  mlip_calc.py prodfrag <prod.db> <model> <models_dir> <charge>
+      Multi-fragment products get the sum of their separated fragments' energies
+      (each in its lowest spin state) instead of the supermolecule energy; the
+      latter is kept in prod.energy_super. See fragment_energy().
+
 Supported models: uma, mace
 """
 import os
@@ -1235,6 +1241,135 @@ def run_dihedral_scan_single(xyzfile, dihedral_csv, dihed0, model_name, models_d
         sys.exit(1)
 
 
+def fragment_energy(atoms, calc, charge=0, expected=None, spin_rule='lowest'):
+    """Energy (eV) of a multi-fragment structure as the sum of its fragments,
+    each evaluated on its own (same geometry). spin_rule 'lowest': lowest spin
+    state, singlet or triplet for even-electron fragments, doublet for odd ones
+    (UMA). 'closed': singlet for even-electron polyatomic fragments, triplet for
+    bare even-electron atoms, doublet for odd ones -- MACE-omol puts triplet H2
+    1.6 kcal/mol below singlet H2 at 0.74 A (and triplet H2O below singlet), so
+    the lowest-energy choice is not usable with it.
+
+    Why: the MLIPs are not trained on bare, unsaturated atoms sitting inside the
+    cutoff of another molecule. For Si2OH6, UMA put "Si + H2 + H4OSi" (PR186)
+    at -56 kcal/mol from the reactant when the separated fragments sum to +109
+    -- wB97M-V gives +115 (supermolecule) / +109 (fragments). The isolated
+    fragments themselves are right (within 0.2 kcal/mol of DFT), and the
+    isolated-atom energies equal the atom_refs (ground-state triplet for Si).
+    Returns (energy_eV, [(formula, mult, energy_eV), ...]), or (None, []) when the
+    structure is a single fragment, the system is charged (no unique way to place
+    the charge) or no bond criterion reproduces `expected` (AutoMeKin's own
+    fragment formulas, "H2 + H4OSi2") and there is no bare heavy atom: the caller
+    then keeps the supermolecule. If nothing matches but there are bare heavy
+    atoms, those are taken out and the rest is evaluated as a single block.
+    Bonds: covalent radii x 1.25 (1.1-1.4 tried if needed to match `expected`),
+    H-H up to 1.0 A (natural_cutoffs puts the H-H cut at 0.74 A and splits
+    slightly stretched H2 into two H atoms)."""
+    from ase.data import covalent_radii
+    from ase.neighborlist import neighbor_list
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    def energy(a, m):
+        a = a.copy()
+        a.info['charge'] = 0
+        a.info['spin'] = m
+        a.calc = calc
+        return a.get_potential_energy()
+
+    if charge != 0:
+        return None, []
+    els = sorted(set(atoms.get_chemical_symbols()))
+    zs = {e: atoms.numbers[atoms.get_chemical_symbols().index(e)] for e in els}
+    exp = sorted(x.strip() for x in expected.split('+')) if expected else None
+
+    def split(f):
+        cut = {(a, b): f * (covalent_radii[zs[a]] + covalent_radii[zs[b]])
+               for a in els for b in els}
+        if ('H', 'H') in cut:
+            cut[('H', 'H')] = 1.0
+        i, j = neighbor_list('ij', atoms, cut)
+        n, lab = connected_components(coo_matrix((np.ones(len(i)), (i, j)),
+                                                 shape=(len(atoms), len(atoms))))
+        return [atoms[[k for k in range(len(atoms)) if lab[k] == c]] for c in range(n)]
+
+    # 1.25 first; the other factors only to reproduce AutoMeKin's own partition
+    for f in (1.25, 1.2, 1.15, 1.1, 1.3, 1.35, 1.4):
+        frags = split(f)
+        if exp is None or sorted(fr.get_chemical_formula() for fr in frags) == exp:
+            break
+    else:
+        # no match: still take out bare heavy atoms (the artifact this guards
+        # against) and keep everything else together as one block
+        frags = split(1.25)
+        bare = [fr for fr in frags if len(fr) == 1 and fr.numbers[0] > 1]
+        if not bare:
+            return None, []
+        rest = [k for k in range(len(atoms))
+                if not any(np.allclose(atoms.positions[k], b.positions[0]) for b in bare)]
+        frags = bare + [atoms[rest]]
+    if len(frags) == 1:
+        return None, []
+    parts = []
+    for frag in frags:
+        if sum(frag.numbers) % 2:
+            mults = (2,)
+        elif spin_rule == 'closed':
+            mults = (3,) if len(frag) == 1 else (1,)
+        else:
+            mults = (1, 3)
+        # ties (bare atoms: the atom_refs carry no spin dependence) -> higher mult
+        e, _, m = min((round(energy(frag, m), 6), -m, m) for m in mults)
+        parts.append((frag.get_chemical_formula(), m, e))
+    return sum(p[2] for p in parts), parts
+
+
+def run_prodfrag(prod_db, model_name, models_dir, charge):
+    """Replace the energy of every multi-fragment product in prod.db (LL, kcal/mol,
+    same E_Ha*627.51 convention as irc_analysis.sh) by the sum of its separated
+    fragments (fragment_energy). The supermolecule energy is kept in a new
+    column energy_super. Barrierless entries (min_diss) already hold fragment
+    energies and are skipped. The fragments must match AutoMeKin's partition:
+    prod.formula is still empty when rxn_network.sh calls this (identifyprod.sh
+    fills it later), so it is computed here with FormulaPROD.sh, the same way
+    identifyprod.sh does."""
+    import subprocess
+
+    def amk_formula(natom, geom):
+        r = subprocess.run(['FormulaPROD.sh'], input=f'{natom}\n\n{geom}\n',
+                           capture_output=True, text=True)
+        return r.stdout.strip() or None
+
+    calc = load_calculator(model_name, models_dir)
+    # MACE-omol's spin dependence is unreliable (see fragment_energy)
+    spin_rule = 'lowest' if model_name.startswith('uma') else 'closed'
+    con = sqlite3.connect(prod_db)
+    cols = [r[1] for r in con.execute('pragma table_info(prod)')]
+    if 'energy_super' not in cols:
+        con.execute('alter table prod add column energy_super REAL')
+    rows = con.execute("select id,name,energy,energy_super,geom,formula,natom from prod "
+                       "where name not like '%min_diss%'").fetchall()
+    print(f"AMK_MLIP prodfrag: {len(rows)} products in {prod_db}", flush=True)
+    for pid, name, e, esup, geom, formula, natom in rows:
+        formula = formula or amk_formula(natom, geom)
+        lines = [l.split() for l in geom.strip().splitlines() if len(l.split()) == 4]
+        from ase import Atoms
+        atoms = Atoms([l[0] for l in lines], positions=[[float(x) for x in l[1:]] for l in lines])
+        efr, parts = fragment_energy(atoms, calc, charge, formula, spin_rule)
+        if efr is None:
+            print(f"  {name:40s} kept supermolecule energy (fragments do not match "
+                  f"'{formula}', no bare heavy atom)", flush=True)
+            continue
+        esup = e if esup is None else esup
+        enew = round(efr / Hartree * 627.51, 2)
+        con.execute('update prod set energy=?, energy_super=? where id=?', (enew, esup, pid))
+        frs = ' + '.join(f'{f}(m={m})' for f, m, _ in parts)
+        print(f"  {name:40s} super {esup:12.2f}  fragments {enew:12.2f}  "
+              f"diff {enew - esup:8.2f}  {frs}", flush=True)
+    con.commit()
+    con.close()
+
+
 def run_serve(req_fifo, resp_fifo, model_name, models_dir, charge, mult):
     """Persistent worker for one amk.sh batch or tors.sh task. Loading the
     UMA checkpoint dominates the cost of every single mlip_calc.py call
@@ -1407,6 +1542,12 @@ def main():
         step_deg     = float(sys.argv[10]) if len(sys.argv) > 10 else 10.0
         run_dihedral_scan_single(xyzfile, dihedral_csv, dihed0, model, models_dir, charge,
                                   mult, npoints, step_deg)
+
+    elif mode == 'prodfrag':
+        if len(sys.argv) != 6:
+            print("Usage: mlip_calc.py prodfrag <prod.db> <model> <models_dir> <charge>")
+            sys.exit(1)
+        run_prodfrag(sys.argv[2], sys.argv[3].lower(), sys.argv[4], int(sys.argv[5]))
 
     else:
         print(__doc__)

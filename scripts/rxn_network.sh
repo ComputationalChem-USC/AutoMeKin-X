@@ -29,6 +29,13 @@ fi
 
 echo "Running irc_analysis.sh"
 irc_analysis.sh
+# MLIP: multi-fragment products get the sum of their separated fragments' energies
+# (see mlip_calc.py fragment_energy); subshell so read_input does not leak variables
+(cwd=$PWD; source utils.sh; read_input > /dev/null    # read_input needs $cwd and $inputfile
+ if [ "$program_irc" = "mlip" ]; then
+    echo "Running mlip_calc.py prodfrag"
+    mlip_calc.py prodfrag ${tsdirll}/PRODs/prod.db $ll_mlip_model $models_dir $charge > ${tsdirll}/PRODs/prodfrag.log 2>&1
+ fi)
 echo "Running minandprod.sh"
 minandprod.sh
 echo "Running sort.sh"
