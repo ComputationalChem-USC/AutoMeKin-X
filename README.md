@@ -35,10 +35,11 @@ AutoMeKin can use several backends for high-level (HL) single-point energies, op
 
 ### MLIP details
 
-When `HighLevel mlip <model>` is set in the input file (with `<model>` = `uma` or `mace`), AutoMeKin uses `scripts/mlip_calc.py` to drive geometry optimizations, TS optimizations, IRC integration, and frequency calculations entirely with the chosen MLIP. This avoids the need for a QM code for HL refinement, and automatically uses the GPU (with multi-GPU batch parallelization) when one is available, falling back to CPU otherwise.
+When `HighLevel mlip <model>` is set in the input file (with `<model>` = `uma`, `uma-s` or `mace`; the same names work as LowLevel, e.g. `LowLevel mlip uma-s`), AutoMeKin uses `scripts/mlip_calc.py` to drive geometry optimizations, TS optimizations, IRC integration, and frequency calculations entirely with the chosen MLIP. This avoids the need for a QM code for HL refinement, and automatically uses the GPU (with multi-GPU batch parallelization) when one is available, falling back to CPU otherwise.
 
 **Supported MLIP models:**
 - `uma` — Meta FAIR UMA-M model (`uma-m-1p1.pt`, optionally paired with `uma-m-1p1_atom_refs.yaml` for atomic reference energies)
+- `uma-s` — Meta FAIR UMA-S 1.2.1 model (`uma-s-1p2p1.pt`; its atomic reference energies are built into the checkpoint). Smaller and faster than `uma` (with `fairchem-core` 2.26 on GPU, ~14 ms per call for a 9-atom molecule vs ~30 ms for `uma`, both on the FP32 fast path). With `fairchem-core` ≥ 2.24 and a GPU of compute capability ≥ 8, `export AMK_MLIP_NITRO=1` runs it with [UMA Nitro](https://github.com/facebookresearch/fairchem) (fused kernels + CUDA graphs, ~2 ms per call). Nitro is off by default because it computes in TF32, which leaves many TS optimizations unconverged at AutoMeKin's tolerance.
 - `mace` — MACE-omol-0-extra-large-1024 model (`MACE-omol-0-extra-large-1024.model`)
 - `delta` — delta-ML correction on top of ORCA r2SCAN-3c HL energies (`HighLevel orca r2scan-3c delta`), per [Rodriguez-Lopez et al., Small Structures 2026, 7, e70504](https://onlinelibrary.wiley.com/doi/10.1002/sstr.70504). For more information on how to use it, see [AMK-ML-corrections-BH](https://github.com/ComputationalChem-USC/AMK-ML-corrections-BH).
 
@@ -73,9 +74,10 @@ eigLmax 0.1
 Energy 150
 ```
 
-Swap `uma` for `mace` to use MACE instead:
+Swap `uma` for `uma-s` or `mace` to use UMA-S or MACE instead:
 
 ```
+HighLevel mlip uma-s
 HighLevel mlip mace
 ```
 
@@ -84,16 +86,17 @@ That's it — no other keyword changes are needed. Everything else (`LowLevel`, 
 **Steps to enable it:**
 
 1. **Get the model weights.** They are not shipped with AutoMeKin:
-   - UMA: `uma-m-1p1.pt` (+ optional `uma-m-1p1_atom_refs.yaml`) from Meta FAIR's [`fairchem`](https://github.com/facebookresearch/fairchem) releases / Hugging Face.
+   - UMA: `uma-m-1p1.pt` (+ optional `uma-m-1p1_atom_refs.yaml`) and/or `uma-s-1p2p1.pt` from Meta FAIR's [`fairchem`](https://github.com/facebookresearch/fairchem) releases / Hugging Face.
    - MACE: `MACE-omol-0-extra-large-1024.model` from the [MACE](https://github.com/ACEsuit/mace) model releases.
 2. **Place them in `$AMK/models/`**, where `$AMK` is your AutoMeKin installation directory:
    ```bash
    mkdir -p "$AMK/models"
    cp uma-m-1p1.pt uma-m-1p1_atom_refs.yaml "$AMK/models/"          # for uma
+   cp uma-s-1p2p1.pt "$AMK/models/"                                # for uma-s
    cp MACE-omol-0-extra-large-1024.model "$AMK/models/"             # for mace
    ```
    AutoMeKin checks for the exact filenames above; if the file is missing it aborts the run with `MLIP model file not found: ...` before submitting any jobs.
-3. **Set `HighLevel mlip <model>`** in the input file, with `<model>` being `uma` or `mace` (case-insensitive).
+3. **Set `HighLevel mlip <model>`** in the input file, with `<model>` being `uma`, `uma-s` or `mace` (case-insensitive).
 4. **Set `charge` and `mult`** in `--General--` as usual — `mlip_calc.py` reads them from the input (they can also be overridden per-structure via a `charge=... mult=...` comment line in an XYZ file).
 5. **Run AutoMeKin as normal.** Internally, each HL step (`TS.sh`, `IRC.sh`, `MIN.sh`, `PRODs.sh`, barrierless location) calls `mlip_calc.py`, which:
    - loads the chosen model once and batch-processes all pending structures (`batch` mode) for efficiency;
@@ -106,6 +109,8 @@ That's it — no other keyword changes are needed. Everything else (`LowLevel`, 
 - MLIP does not provide a Gibbs free energy correction, so AutoMeKin automatically switches HL Boltzmann/microcanonical sorting to use E+ZPE instead when `HighLevel mlip` is set — set `Energy <value>` under `--Kinetics--` (not `Temperature`) as in the example above.
 - `HighLevel mlip` only accepts a single model name — the two-level `method1//method2` HL string supported for `g09`/`g16` does not apply here.
 - `IRCpoints` defaults to 100 for `mlip` if not set explicitly.
+- On GPU, the UMA fast path uses `torch.compile`, whose Triton kernels link against `libcuda.so`; if the driver only installed `libcuda.so.1`, create a `libcuda.so` symlink to it and `export TRITON_LIBCUDA_PATH=<its directory>`.
+- UMA Nitro (`uma-s`) needs `fairchem-core` ≥ 2.24 (torch 2.13), whose `e3nn` ≥ 0.5 is incompatible with `mace-torch` (pinned to `e3nn` 0.4.4): use one Python environment for `uma-s` with Nitro and another one for `mace`. With an older `fairchem-core`, `uma-s` runs without Nitro.
 - For UMA, the optional `uma-m-1p1_atom_refs.yaml` is recommended alongside `uma-m-1p1.pt`: it supplies atomic reference energies used for isolated-atom/single-atom-fragment energies (e.g. barrierless dissociation products); without it those energies can be inaccurate.
 - Final results are collected in `FINAL_ML_<molecule>/` instead of the `FINAL_HL_<molecule>/` used by QM backends.
 - GPU selection has no dedicated AutoMeKin keyword; to restrict which GPU(s) are visible, `export CUDA_VISIBLE_DEVICES=...` in the shell/job script before launching the run.
