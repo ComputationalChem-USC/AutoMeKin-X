@@ -219,6 +219,9 @@ def run_minopt_verified(atoms, name, fmax=0.005, steps=500):
     return converged, freqs_cm, modes, zpe_eV, vib, is_true_min
 
 
+_IRC_HESS_CACHE = {}   # ts_key -> (TS positions, finite-difference Hessian); see run_irc
+
+
 def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
             fmax=IRC_FMAX, steps=IRC_STEPS):
     from sella import IRC
@@ -256,9 +259,18 @@ def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
     # the imaginary mode altogether (all eigenvalues > 0), and then the first
     # kick goes along a stiff mode and falls back onto the TS.
     calc = atoms.calc
+    # ircf_X and ircr_X start from the same TS geometry, so its Hessian is
+    # computed once and reused by the second direction (run_batch hands both
+    # directions of a TS to the same worker, one after the other).
+    ts_key = name[4:] if name[:4] in ('ircf', 'ircr') else name
 
     def _exact_hessian(at):
         from ase.vibrations import Vibrations
+        cached = _IRC_HESS_CACHE.get(ts_key)
+        if cached is not None and np.allclose(cached[0], at.get_positions(), atol=1e-8):
+            print(f"  Reusing the TS Hessian of {ts_key} (computed for the other IRC direction)",
+                  flush=True)
+            return cached[1].copy()
         work = at.copy()
         work.info.update(atoms.info)
         work.calc = calc
@@ -266,6 +278,8 @@ def run_irc(atoms, name, direction, dx=IRC_DX, eta=IRC_ETA, gamma=IRC_GAMMA,
         vib.run()
         h = vib.get_vibrations().get_hessian_2d()
         vib.clean()
+        _IRC_HESS_CACHE.clear()          # keep only the TS being processed
+        _IRC_HESS_CACHE[ts_key] = (at.get_positions().copy(), h.copy())
         return h
 
     dyn = _IRC(atoms, trajectory=f'{name}.traj', dx=dx, eta=eta, gamma=gamma,
@@ -956,24 +970,79 @@ def _cpu_worker_count(model_name):
 
 _GPU_WORKER = {}
 
+# uma on GPU: batch steps (IRC, minima) use the fast calculator (see
+# load_calculator) when each worker gets at least this many entries, so that
+# the ~40 s torch.compile of its first call pays off (fast is ~3x cheaper per
+# call than the default settings). AMK_MLIP_FAST=0 disables it, as in run_serve.
+BATCH_FAST_MIN_JOBS = 4
 
-def _gpu_worker_init(device_queue, calctype, workdir, model_name, models_dir, charge, mult):
+
+def _group_jobs(jobs):
+    """Groups the batch entries into work units: both IRC directions of a TS
+    (ircf_X, ircr_X) go together, so one worker runs them back to back and the
+    second reuses the TS Hessian of the first (see run_irc); any other entry is
+    its own unit. Keeps the database order."""
+    units, where = [], {}
+    for name, xyz in jobs:
+        key = name[4:] if name[:4] in ('ircf', 'ircr') else None
+        if key is not None and key in where:
+            units[where[key]].append((name, xyz))
+            continue
+        if key is not None:
+            where[key] = len(units)
+        units.append([(name, xyz)])
+    return units
+
+
+class _CalcPicker:
+    """Fast uma calculator for the composition of the first entry, default one
+    (loaded lazily) for any other, same policy as run_serve."""
+
+    def __init__(self, model_name, models_dir, use_fast):
+        self.model_name, self.models_dir = model_name, models_dir
+        self.use_fast = use_fast and model_name == 'uma' and get_device() == 'cuda'
+        self.main = load_calculator(model_name, models_dir, fast=self.use_fast)
+        self.formula, self.default = None, (None if self.use_fast else self.main)
+
+    def __call__(self, xyz_content):
+        if not self.use_fast:
+            return self.main
+        from ase import Atoms
+        lines = xyz_content.strip().split('\n')
+        formula = Atoms([l.split()[0] for l in lines[2:] if len(l.split()) >= 4]).get_chemical_formula()
+        if self.formula is None:
+            self.formula = formula
+        if formula == self.formula:
+            return self.main
+        if self.default is None:
+            print(f"  composition {formula} != {self.formula}, loading default {self.model_name} calculator",
+                  flush=True)
+            self.default = load_calculator(self.model_name, self.models_dir)
+        return self.default
+
+
+def _use_batch_fast(njobs, nworkers):
+    return (os.environ.get('AMK_MLIP_FAST', '1') != '0'
+            and njobs / max(1, nworkers) >= BATCH_FAST_MIN_JOBS)
+
+
+def _gpu_worker_init(device_queue, calctype, workdir, model_name, models_dir, charge, mult, use_fast=False):
     """Pool initializer for run_batch on GPU: pins this worker process to one
     device (taken from device_queue, before any CUDA initialization) and
     loads the model once for all the entries it will be handed."""
     device = device_queue.get()
     os.environ['CUDA_VISIBLE_DEVICES'] = device
-    _GPU_WORKER.update(calc=load_calculator(model_name, models_dir), calctype=calctype,
+    _GPU_WORKER.update(pick=_CalcPicker(model_name, models_dir, use_fast), calctype=calctype,
                        model_name=model_name, charge=charge, mult=mult)
-    print(f"  [GPU {device}, pid {os.getpid()}] model loaded", flush=True)
+    print(f"  [GPU {device}, pid {os.getpid()}] model loaded (fast={_GPU_WORKER['pick'].use_fast})", flush=True)
     os.chdir(workdir)
 
 
-def _gpu_worker_task(row):
-    name, xyz_content = row
+def _gpu_worker_task(unit):
     w = _GPU_WORKER
-    process_one(name, xyz_content, w['calc'], _dispatch_calctype(name, w['calctype']),
-                w['model_name'], w['charge'], w['mult'])
+    for name, xyz_content in unit:
+        process_one(name, xyz_content, w['pick'](xyz_content), _dispatch_calctype(name, w['calctype']),
+                    w['model_name'], w['charge'], w['mult'])
 
 
 def _batch_worker(args):
@@ -1030,16 +1099,18 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
             per_gpu = max(1, int(os.environ.get('AMK_MLIP_WORKERS_PER_GPU', '4')))
         except ValueError:
             per_gpu = 4
-        nworkers = min(len(devices) * per_gpu, len(jobs))
+        units = _group_jobs(jobs)
+        nworkers = min(len(devices) * per_gpu, len(units))
+        use_fast = _use_batch_fast(len(jobs), nworkers)
         if nworkers <= 1:
-            calc = load_calculator(model_name, models_dir)
-            print(f"Model loaded on {get_device().upper()}", flush=True)
+            pick = _CalcPicker(model_name, models_dir, use_fast)
+            print(f"Model loaded on {get_device().upper()} (fast={pick.use_fast})", flush=True)
             old_cwd = os.getcwd()
             os.chdir(workdir)
             try:
-                for name, xyz_content in jobs:
+                for name, xyz_content in (row for u in units for row in u):   # both IRC directions together
                     entry_calctype = _dispatch_calctype(name, calctype)
-                    process_one(name, xyz_content, calc, entry_calctype, model_name, charge, mult)
+                    process_one(name, xyz_content, pick(xyz_content), entry_calctype, model_name, charge, mult)
             finally:
                 os.chdir(old_cwd)
         else:
@@ -1051,8 +1122,8 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
                 device_queue.put(devices[k % len(devices)])
             with ctx.Pool(processes=nworkers, initializer=_gpu_worker_init,
                           initargs=(device_queue, calctype, workdir, model_name,
-                                    models_dir, charge, mult)) as pool:
-                for _ in pool.imap_unordered(_gpu_worker_task, jobs, chunksize=1):
+                                    models_dir, charge, mult, use_fast)) as pool:
+                for _ in pool.imap_unordered(_gpu_worker_task, units, chunksize=1):
                     pass
     else:
         # No GPU: parallelize across CPU worker processes if `runningtasks` > 1
@@ -1060,7 +1131,9 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
         if nworkers > 1:
             print(f"No GPU available -- using {nworkers} CPU worker processes "
                   f"in parallel (from runningtasks)", flush=True)
-            chunks = [rows[i::nworkers] for i in range(nworkers)]
+            # whole units (both IRC directions of a TS together, see _group_jobs)
+            units = _group_jobs([r for r in rows if r[1] != 'salir'])
+            chunks = [[row for u in units[i::nworkers] for row in u] for i in range(nworkers)]
             args_list = [
                 (None, chunks[i], calctype, workdir, model_name, models_dir, charge, mult)
                 for i in range(nworkers)
@@ -1074,9 +1147,8 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
             old_cwd = os.getcwd()
             os.chdir(workdir)
             try:
-                for name, xyz_content in rows:
-                    if xyz_content == 'salir':
-                        continue
+                units = _group_jobs([r for r in rows if r[1] != 'salir'])   # both IRC directions together
+                for name, xyz_content in (row for u in units for row in u):
                     entry_calctype = _dispatch_calctype(name, calctype)
                     process_one(name, xyz_content, calc, entry_calctype, model_name, charge, mult)
             finally:
