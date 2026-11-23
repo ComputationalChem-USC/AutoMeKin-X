@@ -51,6 +51,19 @@ echo "╚═╝  ╚═╝ ╚════╝   ╚════╝ ╚═══�
 }
 
 
+## Checkpoint file (in $AMK/models) of an MLIP model name; fails for an unknown
+## name. Keep in sync with MLIP_MODELS in mlip_calc.py.
+##   uma    UMA-M 1.1        uma-s  UMA-S 1.2.1 (UMA Nitro on GPU)        mace   MACE-OMOL-0
+function mlip_model_file {
+   case "$1" in
+      uma)   echo uma-m-1p1.pt ;;
+      uma-s) echo uma-s-1p2p1.pt ;;
+      mace)  echo MACE-omol-0-extra-large-1024.model ;;
+      *)     return 1 ;;
+   esac
+}
+
+
 #Function to submit jobs using slurm
 function slurm {
 #lets the user specify memory
@@ -343,14 +356,9 @@ function read_input {
    if [ "$program_md" = "mlip" ] || [ "$program_opt" = "mlip" ] || [ "$program_irc" = "mlip" ]; then
       models_dir="${AMK}/models"
       export ll_mlip_model models_dir
-      if [ "$ll_mlip_model" != "uma" ] && [ "$ll_mlip_model" != "mace" ]; then
-         echo "mlip requires a model name, e.g.: LowLevel mlip uma (or mace)"
+      if ! model_file_check="${models_dir}/$(mlip_model_file $ll_mlip_model)"; then
+         echo "mlip requires a model name, e.g.: LowLevel mlip uma (or uma-s, mace)"
          exit 1
-      fi
-      if [ "$ll_mlip_model" = "uma" ]; then
-         model_file_check="${models_dir}/uma-m-1p1.pt"
-      else
-         model_file_check="${models_dir}/MACE-omol-0-extra-large-1024.model"
       fi
       if [ ! -f "$model_file_check" ]; then
          echo "MLIP model not found: $model_file_check"
@@ -610,13 +618,9 @@ elif [ "$program_hl" = "g16" ];then
       exit
    fi
 elif [ "$program_hl" = "mlip" ];then
-   if [ "$mlip_model" = "uma" ]; then
-      model_file="${AMK}/models/uma-m-1p1.pt"
-   elif [ "$mlip_model" = "mace" ]; then
-      model_file="${AMK}/models/MACE-omol-0-extra-large-1024.model"
-   else
+   if ! model_file="${AMK}/models/$(mlip_model_file $mlip_model)"; then
       echo ""
-      echo "Unknown MLIP model: $mlip_model. Supported: uma, mace"
+      echo "Unknown MLIP model: $mlip_model. Supported: uma, uma-s, mace"
       echo "Aborting..."
       exit
    fi

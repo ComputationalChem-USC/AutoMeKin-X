@@ -46,8 +46,9 @@ start-up):
       md/partial_opt/tsopt/minopt/dihedral_scan.
       Writes "DONE" or "ERROR: <msg>" to resp_fifo after each job. A "QUIT"
       line ends the loop.
-      For uma on GPU the server uses faster inference settings (see
-      load_calculator(fast=True)); set AMK_MLIP_FAST=0 to disable.
+      For uma/uma-s on GPU the server uses faster inference settings (see
+      _uma_settings; UMA Nitro for uma-s); set AMK_MLIP_FAST=0 to disable them,
+      AMK_MLIP_NITRO=1 to run uma-s with UMA Nitro (TF32; see NITRO_DEFAULT).
 
 Product energies (called by rxn_network.sh after irc_analysis.sh when IRC is mlip):
   mlip_calc.py prodfrag <prod.db> <model> <models_dir> <charge>
@@ -55,7 +56,8 @@ Product energies (called by rxn_network.sh after irc_analysis.sh when IRC is mli
       (each in its lowest spin state) instead of the supermolecule energy; the
       latter is kept in prod.energy_super. See fragment_energy().
 
-Supported models: uma, mace
+Supported models: uma (UMA-M 1.1), uma-s (UMA-S 1.2.1; optional UMA Nitro on GPU
+with fairchem-core >= 2.24), mace (MACE-OMOL-0); see MLIP_MODELS
 """
 import os
 
@@ -124,49 +126,88 @@ def get_device():
     return 'cuda'
 
 
+# MLIP models selectable as "LowLevel mlip <name>" / "HighLevel mlip <name>":
+# name -> (checkpoint, optional atom-reference file) in $AMK/models.
+#   uma    UMA-M 1.1 (Meta FAIR): the most accurate UMA; atom refs from the yaml
+#   uma-s  UMA-S 1.2.1: smaller and much faster (UMA Nitro, see _uma_settings);
+#          its checkpoint already carries the isolated-atom references
+#   mace   MACE-OMOL-0 extra large
+MLIP_MODELS = {
+    'uma':   ('uma-m-1p1.pt', 'uma-m-1p1_atom_refs.yaml'),
+    'uma-s': ('uma-s-1p2p1.pt', None),
+    'mace':  ('MACE-omol-0-extra-large-1024.model', None),
+}
+
+# UMA Nitro (fairchem-core >= 2.24, UMA-S 1.2.1 only, CUDA capability >= 8):
+# fused kernels + CUDA graphs, one system per call -- ~2 ms per call on 9 atoms
+# instead of ~14 ms (FP32 fast path, fairchem 2.26). Opt-in (AMK_MLIP_NITRO=1)
+# because it computes in TF32: on the disilanol benchmark (10 DFT TSs displaced
+# 0.05 A, Sella fmax 0.005, cost_benchmark/piece9_nitro) only 5/10 TS
+# optimizations converged, against 9-10/10 with the FP32 settings -- the same
+# problem as fairchem's TF32 "turbo" on FA.
+NITRO_DEFAULT = '0'
+
+
+def _uma_settings(model_name, device, fast):
+    """fairchem InferenceSettings for an UMA model, built explicitly so that
+    they mean the same on every fairchem version (since 2.24 the preset called
+    "default" is Nitro, with a TF32 fallback for any other checkpoint, and
+    "turbo" no longer exists):
+      default  FP32, unmerged, not compiled (fairchem <= 2.23 "default",
+               >= 2.24 "batch"); valid for any composition
+      fast     FP32, MoLE merged for the first composition + torch.compile
+               (fairchem "turbo" with tf32 off; >= 2.24 "high-precision").
+               Benchmarked on the full FA network (28 TSs + 11 MINs,
+               PROJECTS_Low_Level/uma_benchmark_FA): same energies, geometries
+               and frequencies as the default settings, ~1.9x faster Sella
+               opt+freq. TF32 (stock turbo) is NOT used: its noisier forces left
+               7/28 TSs unconverged at fmax 0.005. The first call pays ~40-115 s
+               of compilation and the merged model raises on any other
+               composition, so the caller needs a default calc to fall back on.
+      nitro    uma-s with fast=True on CUDA, when fairchem has it and
+               AMK_MLIP_NITRO=1 (opt-in, see NITRO_DEFAULT).
+    torch.compile (fast) builds Triton kernels, which link against libcuda.so:
+    on a machine with only libcuda.so.1, point TRITON_LIBCUDA_PATH to a
+    directory with a libcuda.so symlink."""
+    from fairchem.core.units.mlip_unit.api.inference import InferenceSettings
+    if not (fast and device == 'cuda'):
+        return InferenceSettings(tf32=False, activation_checkpointing=True, merge_mole=False,
+                                 compile=False, external_graph_gen=False, internal_graph_gen_version=2)
+    if (model_name == 'uma-s' and os.environ.get('AMK_MLIP_NITRO', NITRO_DEFAULT) != '0'
+            and 'nitro' in InferenceSettings.__dataclass_fields__):
+        major, _ = torch.cuda.get_device_capability()
+        if major >= 8:
+            return InferenceSettings(tf32=True, activation_checkpointing=False, merge_mole=True,
+                                     compile=True, external_graph_gen=False,
+                                     internal_graph_gen_version=2, nitro=True)
+    return InferenceSettings(tf32=False, activation_checkpointing=False, merge_mole=True,
+                             compile=True, external_graph_gen=False, internal_graph_gen_version=2)
+
+
 def load_calculator(model_name, models_dir, fast=False):
-    """fast=True (uma on GPU only; ignored otherwise): fairchem's "turbo"
-    inference settings with tf32 disabled -- MoLE experts merged for the first
-    composition seen plus torch.compile. Benchmarked on the full FA network
-    (28 TSs + 11 MINs, PROJECTS_Low_Level/uma_benchmark_FA): same energies,
-    geometries and frequencies as the default settings, ~1.9x faster Sella
-    opt+freq. Stock turbo (tf32 on) is NOT used: its noisier forces left
-    7/28 TSs unconverged at fmax 0.005. Only meant for the persistent server
-    (run_serve): the first call pays ~40-115 s of compilation, and the merged
-    model raises on any other composition, so the caller needs a default calc
-    to fall back on."""
+    """Calculator of an MLIP_MODELS entry. fast=True only matters for the UMA
+    models on GPU (see _uma_settings)."""
     device = get_device()
     models_path = Path(models_dir)
+    if model_name not in MLIP_MODELS:
+        raise ValueError(f"Unknown model '{model_name}'. Supported: {', '.join(MLIP_MODELS)}")
+    ckpt, refs = MLIP_MODELS[model_name]
+    model_path = models_path / ckpt
+    if not model_path.exists():
+        raise FileNotFoundError(f"MLIP model not found: {model_path}")
 
-    if model_name == 'uma':
+    if model_name.startswith('uma'):
         from fairchem.core import FAIRChemCalculator, pretrained_mlip
         from omegaconf import OmegaConf
-        model_path = models_path / 'uma-m-1p1.pt'
-        refs_path  = models_path / 'uma-m-1p1_atom_refs.yaml'
-        if not model_path.exists():
-            raise FileNotFoundError(f"UMA model not found: {model_path}")
-        atom_refs = OmegaConf.load(refs_path) if refs_path.exists() else None
-        settings = 'default'
-        if fast and device == 'cuda':
-            import dataclasses
-            from fairchem.core.units.mlip_unit.api.inference import inference_settings_turbo
-            settings = dataclasses.replace(inference_settings_turbo(), tf32=False)
+        refs_path = models_path / refs if refs else None
+        atom_refs = OmegaConf.load(refs_path) if refs_path and refs_path.exists() else None
         pred_unit = pretrained_mlip.load_predict_unit(str(model_path), device=device,
-                                                      inference_settings=settings,
+                                                      inference_settings=_uma_settings(model_name, device, fast),
                                                       atom_refs=atom_refs)
         return FAIRChemCalculator(pred_unit, task_name='omol')
 
-    elif model_name == 'mace':
-        from mace.calculators import MACECalculator
-        model_path = models_path / 'MACE-omol-0-extra-large-1024.model'
-        if not model_path.exists():
-            raise FileNotFoundError(f"MACE model not found: {model_path}")
-        return MACECalculator(
-            model_paths=str(model_path), device=device, default_dtype='float32'
-        )
-
-    else:
-        raise ValueError(f"Unknown model '{model_name}'. Supported: uma, mace")
+    from mace.calculators import MACECalculator
+    return MACECalculator(model_paths=str(model_path), device=device, default_dtype='float32')
 
 
 def run_tsopt(atoms, name, fmax=0.005, steps=500):
@@ -920,7 +961,7 @@ def process_one(name, xyz_content, calc, calctype, model_name, charge=0, mult=1)
 # VmHWM/ru_maxrss (the high-water mark, not steady-state VmRSS -- the peak
 # happens transiently while the checkpoint is loaded/converted, and that peak
 # is what the OS must be able to satisfy, even though usage drops afterward).
-_CPU_WORKER_RAM_GB = {'uma': 24.0, 'mace': 2.0}
+_CPU_WORKER_RAM_GB = {'uma': 24.0, 'uma-s': 8.0, 'mace': 2.0}
 _CPU_WORKER_RAM_GB_DEFAULT = 24.0  # conservative fallback for unlisted models
 
 
@@ -1000,7 +1041,7 @@ class _CalcPicker:
 
     def __init__(self, model_name, models_dir, use_fast):
         self.model_name, self.models_dir = model_name, models_dir
-        self.use_fast = use_fast and model_name == 'uma' and get_device() == 'cuda'
+        self.use_fast = use_fast and model_name.startswith('uma') and get_device() == 'cuda'
         self.main = load_calculator(model_name, models_dir, fast=self.use_fast)
         self.formula, self.default = None, (None if self.use_fast else self.main)
 
@@ -1464,7 +1505,7 @@ def run_serve(req_fifo, resp_fifo, model_name, models_dir, charge, mult):
     every job whose composition matches the first one served; a default
     calculator is loaded lazily for any other composition, since the merged
     model can't handle it. AMK_MLIP_FAST=0 disables the fast path."""
-    use_fast = model_name == 'uma' and os.environ.get('AMK_MLIP_FAST', '1') != '0'
+    use_fast = model_name.startswith('uma') and os.environ.get('AMK_MLIP_FAST', '1') != '0'
     print(f"AMK_MLIP serve: loading {model_name} (fast={use_fast})...", flush=True)
     fast_calc = load_calculator(model_name, models_dir, fast=use_fast)
     fast_formula = None
