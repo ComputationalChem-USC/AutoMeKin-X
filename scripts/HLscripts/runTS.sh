@@ -38,6 +38,19 @@ if [ "$inp" != "salir" ]; then
          unset SLURM_JOBID PMI_FD PMI_PORT PMIX_ID PMIX_SERVER_URI
          $(which orca) ${name}_retry.inp > ${name}.out 2>&1
       fi
+      # 20261014: OptTS that reached MaxIter without converging -> one restart from its last
+      # geometry (${name}.xyz) with twice the cycles; the first attempt is kept as ${name}_try1.*
+      if grep -q "did not converge" ${name}.out && [ -f ${name}.xyz ]; then
+         cp ${name}.inp ${name}_try1.inp; cp ${name}.out ${name}_try1.out
+         cp ${name}.xyz ${name}_start.xyz
+         awk -v xyz="${name}_start.xyz" '
+            /^ *MaxIter/ && !done_it {sub(/[0-9]+/, 2*$2); done_it=1}
+            /^\* *xyz /{print "* xyzfile", $3, $4, xyz; skip=1; next}
+            skip && /^\*/{skip=0; next}
+            !skip{print}' ${name}_try1.inp > ${name}.inp
+         unset SLURM_JOBID PMI_FD PMI_PORT PMIX_ID PMIX_SERVER_URI
+         $(which orca) ${name}.inp > ${name}.out 2>&1
+      fi
       # Copiar salida con extensión .log para compatibilidad con el resto del pipeline
       cp ${name}.out ${name}.log
    elif [ "$3" = "qcore" ]; then

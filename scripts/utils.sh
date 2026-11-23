@@ -1978,9 +1978,14 @@ function check_freq_ts {
 if [ "$program_hl" = "g09" ] || [ "$program_hl" = "g16" ]; then
    ok=$(awk 'BEGIN{fok=0;ok=0;nt=0};/Frequencies/{++nfreq;if($3<0 && $4>0 && nfreq==1) fok=1};/Normal termi/{++nt};END{if(nt==('$noHLcalc'+1) && fok==1) ok=1; print ok}' $tsdirhl/${name}.log)
 elif [ "$program_hl" = "orca" ]; then
-      ok=$(awk 'BEGIN{fok=0;ok=0;nt=0}
+# 20261014: the OptTS must have converged (HURRAY, no "did not converge"). A run that reaches
+# MaxIter still ends with ORCA TERMINATED NORMALLY and skips the final NumFreq, so the last
+# frequency block is from a Recalc_Hess of an earlier cycle.
+      ok=$(awk 'BEGIN{fok=0;ok=0;nt=0;conv=0;nc=0}
    /ORCA TERMINATED NORMALLY/{++nt}
    /ERROR !!!/{nt=0}
+   /HURRAY/{conv=1}
+   /did not converge/{nc=1}
    /VIBRATIONAL FREQUENCIES/{
       getline; getline; getline; getline
       first=0; second=0; fok=0
@@ -1996,7 +2001,7 @@ elif [ "$program_hl" = "orca" ]; then
       }
       if(first<0 && second>0) fok=1
    }
-   END{if(nt==1 && fok==1) ok=1; print ok}' $tsdirhl/${name}.log)
+   END{if(nt==1 && fok==1 && conv==1 && nc==0) ok=1; print ok}' $tsdirhl/${name}.log)
 elif [ "$program_hl" = "qcore" ]; then
    ok=$(awk 'BEGIN{ok=0};/Freq/{getline;f1=$1;getline;f2=$1;if(f1<0 && f2>0) ok=1};END{print ok}' $tsdirhl/${name}.log)
 elif [ "$program_hl" = "mlip" ]; then
