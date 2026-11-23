@@ -200,7 +200,11 @@ function read_input {
    # became a severe bottleneck for systems with many rotatable bonds/fast-
    # growing minima pools, since that one task's per-iteration workload
    # grows with the whole run while everything else stays parallel).
-   ntorstasks=$(awk 'BEGIN{nt=1};{if($1=="ntorstasks") nt=$2};END{print nt}' $inputfile)
+   # With an mlip LowLevel the default is 10: there every scan point and TS
+   # optimization is a model call, and the cost benchmark of 2026-11 showed the
+   # single torsion task setting the TS-search wall time of iterations 2-3.
+   # An explicit ntorstasks keyword always wins.
+   ntorstasks=$(awk 'BEGIN{nt=1;user=""};{if(($1=="LowLevel" || $1=="LowLevel_TSopt") && tolower($2)=="mlip") nt=10};{if($1=="ntorstasks") user=$2};END{print (user!="" ? user : nt)}' $inputfile)
    md=$(awk 'BEGIN{md=2};{if($1=="sampling" && $2=="BXDE") md=0; if($1=="sampling" && $2=="MD-micro") md=1;if($1=="sampling" && $2=="MD") md=2;if($1=="sampling" && $2=="association") md=-1;if($1=="sampling" && $2=="vdW") md=0; if($1=="sampling" && $2=="external") md=-1};END{print md}'  $inputfile)
    rate=$(awk 'BEGIN{rate=-1};{if ($1=="Temperature") rate=0;if($1=="Energy") rate=1};END{print rate}' $inputfile)
    tread=$(awk 'BEGIN{t=298};{if($1=="Temperature") t=$2};END{printf "%d",t+0.5}' $inputfile)
