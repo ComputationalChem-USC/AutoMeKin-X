@@ -130,7 +130,7 @@ nojf=$((nojf + ntorstasks))
 #start (single-threaded here, so no race with the flock'd partitioning tors.sh
 #does per-shard -- see tors.sh for why this must be cleared every iteration).
 if [ $torsion -ne 0 ]; then
-   rm -f ${tsdirll}/tmp_tors.ready ${tsdirll}/tmp_tors.shard*
+   rm -f ${tsdirll}/tmp_tors.ready ${tsdirll}/tmp_tors.queue
 fi
 #Then we submit the nojf-noj1+1 trajectory jobs
 #ft2 slurm

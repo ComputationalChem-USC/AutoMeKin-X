@@ -86,17 +86,27 @@ mindb=${tsdirll}/MINs/SORTED/mins.db
 # The "which minima are new since the last scan" computation below touches
 # the shared $minrf/$tmpti files (outside any per-batch cwd), so it must
 # run exactly once per iteration, not once per shard -- flock serializes
-# that, and whichever shard gets there first also partitions the new-minima
-# list round-robin into one file per shard (tmp_tors.shardN) for everyone
-# to read afterwards. amk_parallel.sh clears tmp_tors.ready/tmp_tors.shard*
-# once, single-threaded, before dispatching this iteration's parallel jobs,
-# so a stale "ready" marker from a previous iteration can't be mistaken for
-# this one's.
+# that, and whichever shard gets there first also writes the new-minima
+# list to a shared queue (tmp_tors.queue) from which every shard takes the
+# next minimum, under the same lock, as soon as it finishes the previous one
+# (a fixed split leaves shards idle while others still have expensive minima
+# to scan). amk_parallel.sh clears tmp_tors.ready/tmp_tors.queue once,
+# single-threaded, before dispatching this iteration's parallel jobs, so a
+# stale "ready" marker from a previous iteration can't be mistaken for this
+# one's.
 TORS_SHARD="${TORS_SHARD:-1}"
 TORS_NSHARDS="${TORS_NSHARDS:-1}"
 tmpti_ready=${tsdirll}/tmp_tors.ready
 tmpti_lock=${tsdirll}/tmp_tors.lock
-tmpti_mine=${tsdirll}/tmp_tors.shard${TORS_SHARD}
+tmpti_queue=${tsdirll}/tmp_tors.queue
+## Prints the next minimum of the queue (and removes it), or nothing once empty
+function next_tors_min {
+   (
+      flock -x 202
+      awk 'NR==1{print $1}' $tmpti_queue
+      sed -i 1d $tmpti_queue
+   ) 202>>${tmpti_lock}
+}
 
 (
    flock -x 202
@@ -114,19 +124,12 @@ tmpti_mine=${tsdirll}/tmp_tors.shard${TORS_SHARD}
          echo " min0     0.00" > $minrf
          echo " min0     0.00" > $tmpti
       fi
-      rm -f ${tsdirll}/tmp_tors.shard*
-      awk -v n="$TORS_NSHARDS" -v base="${tsdirll}/tmp_tors.shard" '{
-         s = ((NR-1) % n) + 1
-         print $0 >> (base s)
-      }' $tmpti
-      for s in $(seq 1 $TORS_NSHARDS); do
-         [ -f ${tsdirll}/tmp_tors.shard$s ] || : > ${tsdirll}/tmp_tors.shard$s
-      done
+      cp $tmpti $tmpti_queue
       touch "$tmpti_ready"
    fi
 ) 202>>${tmpti_lock}
 
-if [ $(wc -l $tmpti_mine 2>/dev/null | awk '{print $1}') -eq 0 ]; then
+if [ $(wc -l $tmpti_queue 2>/dev/null | awk '{print $1}') -eq 0 ]; then
    echo No further min have been found for this shard
    exit 1
 fi
@@ -138,7 +141,7 @@ if [ "$program_opt" = "mlip" ] && [ -n "$ll_mlip_model" ]; then
    mlip_server_start
 fi
 
-for min in $(awk '{print $1}' $tmpti_mine)
+while min=$(next_tors_min) && [ -n "$min" ]
 do
    printf "\n=====MIN: %4s =====\n" $min
    names="MIN"$min
