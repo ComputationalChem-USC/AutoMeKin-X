@@ -251,6 +251,10 @@ do
       elif [ "$program_opt" = "mlip" ]; then
          cp mingeom mingeom_tors.xyz
          mlip_run dihedral_scan mingeom_tors.xyz "$labels" $dihed0
+         if [ -f tors.out ]; then
+            npts=$(awk '/VARIABLE/{n++};END{print n+0}' tors.out)
+            if [ $npts -lt 36 ]; then echo "WARNING: only $npts/36 scan points converged (see mlip_server.log)" ; fi
+         fi
       else
          internlastatom="$(awk '{print $1,$2,$3,$4," 0 ",$6,$7,'$l1','$l2','$l3'}' intern.out)"
          sed 's/method/'"$method"' charge='$charge'/g' $sharedir/path_template >tors.mop

@@ -414,32 +414,201 @@ def run_dihedral_scan(atoms, dihedral_indices, dihed0, npoints=36, step_deg=10.0
     ref_positions = atoms.get_positions().copy()
     symbols = atoms.get_chemical_symbols()
     eV_to_kcalmol = mol / kcal
+    targets = [dihed0 + i * step_deg for i in range(npoints)]
 
-    lines = ["POTENTIAL ENERGY SURFACE SCAN\n"]
-    for i in range(npoints):
-        target = dihed0 + i * step_deg
-        atoms.set_constraint()
-        atoms.set_positions(ref_positions)
-        atoms.set_dihedral(a1, a2, a3, a4, target)
+    def relax_point(at, i):
+        """Relax one scan point in place; returns its energy (kcal/mol) or None."""
+        target = targets[i]
+        at.set_constraint()
+        at.set_positions(ref_positions)
+        at.set_dihedral(a1, a2, a3, a4, target)
         try:
-            atoms.set_constraint(FixInternals(dihedrals_deg=[[target, [a1, a2, a3, a4]]]))
-            dyn = FIRE(atoms, logfile=None)
+            at.set_constraint(FixInternals(dihedrals_deg=[[target, [a1, a2, a3, a4]]]))
+            dyn = FIRE(at, logfile=None)
             dyn.run(fmax=fmax, steps=steps)
-            energy_kcal = atoms.get_potential_energy() * eV_to_kcalmol
+            return at.get_potential_energy() * eV_to_kcalmol
         except Exception as e:
             print(f"  Point {i+1} ({target:.1f} deg): failed ({e})", flush=True)
-            continue
+            return None
         finally:
-            atoms.set_constraint()
+            at.set_constraint()
 
+    # The points are independent, so with MACE they are relaxed side by side
+    # with their model calls batched into one forward pass (see
+    # _run_batched); same FIRE runs, same results up to float32 round-off.
+    # Not with UMA: fairchem's turbo mode recompiles the model for every new
+    # batch size and the 36-structure batches ran the GPU out of memory, so
+    # most points failed. AMK_MLIP_BATCH=0 restores the one-point-at-a-time
+    # loop for MACE as well.
+    if (os.environ.get('AMK_MLIP_BATCH', '1') != '0' and npoints > 1
+            and type(atoms.calc).__name__ == 'MACECalculator'):
+        point_atoms = [atoms.copy() for _ in range(npoints)]
+        energies = _run_batched(atoms.calc, point_atoms, relax_point)
+    else:
+        point_atoms, energies = [], []
+        for i in range(npoints):
+            energies.append(relax_point(atoms, i))
+            point_atoms.append(atoms.copy())
+
+    lines = ["POTENTIAL ENERGY SURFACE SCAN\n"]
+    for target, at, energy_kcal in zip(targets, point_atoms, energies):
+        if energy_kcal is None:
+            continue
         lines.append("  VARIABLE        FUNCTION\n")
         lines.append(f"{target:10.1f}  -  {energy_kcal:13.3f}\n")
         lines.append("\n\n\n")
-        for sym, pos in zip(symbols, atoms.get_positions()):
+        for sym, pos in zip(symbols, at.get_positions()):
             lines.append(f"{sym} {pos[0]:14.8f} {pos[1]:14.8f} {pos[2]:14.8f}\n")
 
     with open("tors.out", "w") as f:
         f.writelines(lines)
+    nfailed = sum(e is None for e in energies)
+    if nfailed:
+        print(f"  WARNING: {nfailed}/{npoints} scan points failed", flush=True)
+
+
+def batch_energy_forces(calc, atoms_list):
+    """Energies (eV) and forces (eV/Ang) for several structures in one model
+    forward pass -- same graphs and same model call the ASE calculators
+    (MACECalculator / FAIRChemCalculator) build for a single structure, just
+    batched. Falls back to one calculator call per structure for anything
+    else."""
+    if type(calc).__name__ == 'MACECalculator' and calc.num_models == 1:
+        from mace import data as mace_data
+        from mace.tools import torch_geometric, torch_tools
+        keyspec = mace_data.KeySpecification(info_keys=calc.info_keys,
+                                             arrays_keys=calc.arrays_keys)
+        with torch_tools.default_dtype(calc.default_dtype):
+            graphs = [mace_data.AtomicData.from_config(
+                          mace_data.config_from_atoms(a, key_specification=keyspec,
+                                                      head_name=calc.head),
+                          z_table=calc.z_table, cutoff=calc.r_max, heads=calc.available_heads)
+                      for a in atoms_list]
+        batch = torch_geometric.Batch.from_data_list(graphs).to(calc.device)
+        model = calc.models[0]
+        model_dtype = next(model.parameters()).dtype
+        for key in batch.keys:
+            value = batch[key]
+            if torch.is_tensor(value) and torch.is_floating_point(value):
+                batch[key] = value.to(dtype=model_dtype)
+        out = model(batch.to_dict(), compute_stress=False, training=False)
+        energies = out['energy'].detach().cpu().numpy() * calc.energy_units_to_eV
+        forces = (out['forces'].detach().cpu().numpy()
+                  * calc.energy_units_to_eV / calc.length_units_to_A)
+    elif type(calc).__name__ == 'FAIRChemCalculator':
+        from fairchem.core.datasets.atomic_data import atomicdata_list_to_batch
+        for a in atoms_list:
+            calc.predictor.validate_atoms_data(a, calc.task_name)
+        batch = atomicdata_list_to_batch([calc.a2g(a) for a in atoms_list])
+        pred = calc.predictor.predict(batch)
+        energies = pred['energy'].detach().cpu().numpy()
+        forces = pred['forces'].detach().cpu().numpy()
+    else:
+        results = []
+        for a in atoms_list:
+            a = a.copy()
+            a.calc = calc
+            results.append((a.get_potential_energy(), a.get_forces(apply_constraint=False)))
+        return results
+    splits = np.cumsum([len(a) for a in atoms_list])[:-1]
+    return [(float(e), f) for e, f in zip(energies, np.split(forces, splits))]
+
+
+class _BatchBroker:
+    """Collects the model calls of several optimizations running side by
+    side (one thread each) and serves them with one batched forward pass
+    once every still-running optimization is waiting for its forces."""
+
+    def __init__(self, calc, nactive):
+        import threading
+        self.calc = calc
+        self.nactive = nactive
+        self.pending = []
+        self.cv = threading.Condition()
+
+    def request(self, atoms):
+        slot = {'atoms': atoms, 'result': None}
+        with self.cv:
+            self.pending.append(slot)
+            self._flush_if_ready()
+            while slot['result'] is None:
+                self.cv.wait()
+        if isinstance(slot['result'], Exception):
+            raise slot['result']
+        return slot['result']
+
+    def leave(self):
+        with self.cv:
+            self.nactive -= 1
+            self._flush_if_ready()
+
+    def _flush_if_ready(self):
+        if not self.pending or len(self.pending) < self.nactive:
+            return
+        slots, self.pending = self.pending, []
+        # Split into forward passes of at most AMK_MLIP_MAX_BATCH_ATOMS atoms
+        # (GPU memory grows with it: ~3.4 GiB for 36 x 18 atoms with MACE).
+        max_atoms = int(os.environ.get('AMK_MLIP_MAX_BATCH_ATOMS', '1000'))
+        chunks, chunk, natoms = [], [], 0
+        for s in slots:
+            if chunk and natoms + len(s['atoms']) > max_atoms:
+                chunks.append(chunk)
+                chunk, natoms = [], 0
+            chunk.append(s)
+            natoms += len(s['atoms'])
+        chunks.append(chunk)
+        results = []
+        for chunk in chunks:
+            try:
+                results.extend(batch_energy_forces(self.calc, [s['atoms'] for s in chunk]))
+            except Exception:
+                # e.g. out of GPU memory: retry one structure at a time so that
+                # a failed pass doesn't fail every point in it
+                for s in chunk:
+                    try:
+                        results.extend(batch_energy_forces(self.calc, [s['atoms']]))
+                    except Exception as e:
+                        results.append(e)
+        for s, r in zip(slots, results):
+            s['result'] = r
+        self.cv.notify_all()
+
+
+def _run_batched(calc, atoms_list, func):
+    """Runs func(atoms_list[i], i) for every i, one thread each, with every
+    model call routed through a shared _BatchBroker. Returns the list of
+    func's return values."""
+    import threading
+    from ase.calculators.calculator import Calculator, all_changes
+
+    class _BrokerCalc(Calculator):
+        implemented_properties = ['energy', 'free_energy', 'forces']
+
+        def __init__(self, broker):
+            super().__init__()
+            self.broker = broker
+
+        def calculate(self, atoms=None, properties=('energy',), system_changes=all_changes):
+            super().calculate(atoms, properties, system_changes)
+            energy, forces = self.broker.request(self.atoms)
+            self.results = {'energy': energy, 'free_energy': energy, 'forces': forces}
+
+    broker = _BatchBroker(calc, len(atoms_list))
+    results = [None] * len(atoms_list)
+
+    def work(i):
+        try:
+            atoms_list[i].calc = _BrokerCalc(broker)
+            results[i] = func(atoms_list[i], i)
+        finally:
+            broker.leave()
+
+    threads = [threading.Thread(target=work, args=(i,)) for i in range(len(atoms_list))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return results
 
 
 def _project_trans_rot(atoms, hessian_2d):
@@ -779,23 +948,40 @@ def _cpu_worker_count(model_name):
     return max(1, n)
 
 
+_GPU_WORKER = {}
+
+
+def _gpu_worker_init(device_queue, calctype, workdir, model_name, models_dir, charge, mult):
+    """Pool initializer for run_batch on GPU: pins this worker process to one
+    device (taken from device_queue, before any CUDA initialization) and
+    loads the model once for all the entries it will be handed."""
+    device = device_queue.get()
+    os.environ['CUDA_VISIBLE_DEVICES'] = device
+    _GPU_WORKER.update(calc=load_calculator(model_name, models_dir), calctype=calctype,
+                       model_name=model_name, charge=charge, mult=mult)
+    print(f"  [GPU {device}, pid {os.getpid()}] model loaded", flush=True)
+    os.chdir(workdir)
+
+
+def _gpu_worker_task(row):
+    name, xyz_content = row
+    w = _GPU_WORKER
+    process_one(name, xyz_content, w['calc'], _dispatch_calctype(name, w['calctype']),
+                w['model_name'], w['charge'], w['mult'])
+
+
 def _batch_worker(args):
-    """Worker function: processes a subset of entries on one GPU, or on CPU
-    (gpu_id=None) as one of several CPU worker processes."""
+    """Worker function: processes a subset of entries as one of several CPU
+    worker processes."""
     gpu_id, rows, calctype, workdir, model_name, models_dir, charge, mult = args
-    if gpu_id is not None:
-        # Set GPU visibility before any CUDA initialization
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
-    else:
-        # Force this worker onto CPU even if CUDA is technically visible,
-        # and keep it single-threaded: parallelism here comes from running
-        # several worker *processes*, matching how `doparallel` runs several
-        # single-core ORCA/Gaussian jobs -- not from multi-threading one process.
-        os.environ['CUDA_VISIBLE_DEVICES'] = ''
-        torch.set_num_threads(1)
+    # Force this worker onto CPU even if CUDA is technically visible,
+    # and keep it single-threaded: parallelism here comes from running
+    # several worker *processes*, matching how `doparallel` runs several
+    # single-core ORCA/Gaussian jobs -- not from multi-threading one process.
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    torch.set_num_threads(1)
     calc = load_calculator(model_name, models_dir)
-    tag = f"GPU {gpu_id}" if gpu_id is not None else f"CPU worker (pid {os.getpid()})"
-    print(f"  [{tag}] model loaded, {len(rows)} entries", flush=True)
+    print(f"  [CPU worker (pid {os.getpid()})] model loaded, {len(rows)} entries", flush=True)
     old_cwd = os.getcwd()
     os.chdir(workdir)
     try:
@@ -823,31 +1009,45 @@ def run_batch(calctype, workdir, model_name, models_dir, charge, mult):
     con.close()
 
     ngpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+    jobs = [r for r in rows if r[1] != 'salir']
 
-    if ngpus == 1:
-        calc = load_calculator(model_name, models_dir)
-        print(f"Model loaded on {get_device().upper()}", flush=True)
-        old_cwd = os.getcwd()
-        os.chdir(workdir)
+    if ngpus >= 1:
+        # A single small-molecule calculation is bound by kernel-launch
+        # latency and leaves the GPU mostly idle (MACE on FA: ~10 ms of GPU
+        # work in a ~40 ms call), so run several worker processes per GPU
+        # (AMK_MLIP_WORKERS_PER_GPU, default 4: one GPU saturates at ~4).
+        # Entries are handed out one at a time as workers free up.
+        visible = os.environ.get('CUDA_VISIBLE_DEVICES')
+        devices = ([d.strip() for d in visible.split(',')] if visible
+                   else [str(i) for i in range(ngpus)])[:ngpus]
         try:
-            for name, xyz_content in rows:
-                if xyz_content == 'salir':
-                    continue
-                entry_calctype = _dispatch_calctype(name, calctype)
-                process_one(name, xyz_content, calc, entry_calctype, model_name, charge, mult)
-        finally:
-            os.chdir(old_cwd)
-    elif ngpus >= 2:
-        print(f"Using {ngpus} GPUs in parallel", flush=True)
-        # Interleaved split for better load balancing
-        chunks = [rows[i::ngpus] for i in range(ngpus)]
-        args_list = [
-            (i, chunks[i], calctype, workdir, model_name, models_dir, charge, mult)
-            for i in range(ngpus)
-        ]
-        ctx = mp.get_context('spawn')
-        with ctx.Pool(processes=ngpus) as pool:
-            pool.map(_batch_worker, args_list)
+            per_gpu = max(1, int(os.environ.get('AMK_MLIP_WORKERS_PER_GPU', '4')))
+        except ValueError:
+            per_gpu = 4
+        nworkers = min(len(devices) * per_gpu, len(jobs))
+        if nworkers <= 1:
+            calc = load_calculator(model_name, models_dir)
+            print(f"Model loaded on {get_device().upper()}", flush=True)
+            old_cwd = os.getcwd()
+            os.chdir(workdir)
+            try:
+                for name, xyz_content in jobs:
+                    entry_calctype = _dispatch_calctype(name, calctype)
+                    process_one(name, xyz_content, calc, entry_calctype, model_name, charge, mult)
+            finally:
+                os.chdir(old_cwd)
+        else:
+            print(f"Using {len(devices)} GPU(s) x {per_gpu} workers ({nworkers} processes)",
+                  flush=True)
+            ctx = mp.get_context('spawn')
+            device_queue = ctx.Queue()
+            for k in range(nworkers):
+                device_queue.put(devices[k % len(devices)])
+            with ctx.Pool(processes=nworkers, initializer=_gpu_worker_init,
+                          initargs=(device_queue, calctype, workdir, model_name,
+                                    models_dir, charge, mult)) as pool:
+                for _ in pool.imap_unordered(_gpu_worker_task, jobs, chunksize=1):
+                    pass
     else:
         # No GPU: parallelize across CPU worker processes if `runningtasks` > 1
         nworkers = _cpu_worker_count(model_name)
