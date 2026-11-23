@@ -14,6 +14,21 @@ else
    batchn=$(($1-$ntors))
    batch=batch$batchn
 fi
+##Spread the parallel tasks over the visible GPUs so that MLIP jobs don't all
+##default to the first one. Round-robin on GNU parallel's job slot (each slot
+##stays bound to one GPU, so the load is balanced whatever the order in which
+##jobs finish); falls back to the task number outside parallel. Honors a
+##CUDA_VISIBLE_DEVICES list set by the user; an empty one (CPU only) is kept.
+if [ "${CUDA_VISIBLE_DEVICES-unset}" = "unset" ]; then
+   gpus=$(nvidia-smi -L 2>/dev/null | awk '/^GPU/{sub(":","",$2);printf "%s%s",(n++?",":""),$2}')
+else
+   gpus=$CUDA_VISIBLE_DEVICES
+fi
+if [ -n "$gpus" ]; then
+   IFS=, read -ra gpu_list <<< "$gpus"
+   slot=${PARALLEL_JOBSLOT:-$1}
+   export CUDA_VISIBLE_DEVICES=${gpu_list[$(( (slot-1) % ${#gpu_list[@]} ))]}
+fi
 #Make batch directory
 if [ -d ${batch} ]; then  rm -r ${batch} ; fi
 mkdir ${batch}
