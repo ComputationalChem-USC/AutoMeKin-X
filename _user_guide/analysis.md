@@ -8,33 +8,33 @@ permalink: /docs/analysis.html
 
 ## Visualization tools<a name="amktools"></a>
 
-The Python library [![GitHub - amk_tools](https://img.shields.io/badge/GitHub-amk_tools-blue?logo=github)](https://github.com/dgarayr/amk_tools/) developed by Diego Garay at  the Institute of Chemical Research of Catalonia, is a useful package to parse, process and transform the reaction networks created by AutoMeKin. All the data contained in `FINALDIR` can be easily accessed using these tools.
+The Python library [![GitHub - amk_tools_X](https://img.shields.io/badge/GitHub-amk__tools__X-blue?logo=github)](https://github.com/ComputationalChem-USC/amk_tools_X), maintained by the ComputationalChem-USC group and based on the original [amk_tools](https://github.com/dgarayr/amk_tools) by Diego Garay-Ruiz (Institute of Chemical Research of Catalonia), is a useful package to parse, process and transform the reaction networks created by AutoMeKin. All the data contained in `FINALDIR` can be easily accessed using these tools. Install it in `amk_env` with `pip install git+https://github.com/ComputationalChem-USC/amk_tools_X.git` (see [Installation](installation.html#amktools)).
 
 The commandline script `amk_gen_view.py` allows to generate visualizations directly taking arguments
 from STDIN:
 ```bash
 amk_gen_view.py FINALDIR RXNFILE
 ```` 
-where `RXNFILE` is the name of the `RXNet` files explained above (`RXNet`, `RXNet.cg` or `RXNet.rel`). Additional arguments that may be passed are [detailed here](https://github.com/dgarayr/amk_tools/blob/master/UserGuide.md).
+where `RXNFILE` is the name of the `RXNet` files explained above (`RXNet`, `RXNet.cg` or `RXNet.rel`). Additional arguments that may be passed are [detailed here](https://github.com/ComputationalChem-USC/amk_tools_X#usage-guidelines).
 
 The following example shows how to create interactive plots from `RXNet.cg` file including all paths found at low level for Formic Acid:
 ```bash
-amk_gen_view.py FINAL_LL_FA RXNet.cg --b --paths
+amk_gen_view.py FINAL_LL_FA RXNet.cg -b --paths
 ```
 While this one creates the corresponding plots for the paths that connect MIN1 with the H<sub>2</sub>+CO<sub>2</sub> products:
 ```bash
 amk_gen_view.py FINAL_LL_FA RXNet.cg --paths MIN1 H2+CO2
 ```
-More details can be found in the [user guide](https://github.com/dgarayr/amk_tools/blob/master/UserGuide.md)
+More details can be found in the [user guide](https://github.com/ComputationalChem-USC/amk_tools_X/blob/master/UserGuide.md)
 
-Example of an interactive dashboard for FA, with the reaction network on the left and a selected edge, _i.e._, TS, on the right. Clicking on “Show profile” enables visualization of the energy profile as well.
+Example of an interactive dashboard for FA: the reaction network, the 3D structure of a selected node or edge (_i.e._, a minimum or a TS) with its normal modes, and the energy profiles.
 <p align="center">
    <img src="{{ "/assets/images/amk.jpg" | relative_url }}" alt="alt text" width="800" height="400">
 </p>
 
 ## Properties of the reaction network<a name="amktools2"></a>
 
-Another commandline script from the same Python library [![GitHub - amk_tools](https://img.shields.io/badge/GitHub-amk_tools-blue?logo=github)](https://github.com/dgarayr/amk_tools/) can be used to obtain the properties of the reaction network: 
+Another commandline script from the same Python library [![GitHub - amk_tools_X](https://img.shields.io/badge/GitHub-amk__tools__X-blue?logo=github)](https://github.com/ComputationalChem-USC/amk_tools_X) can be used to obtain the properties of the reaction network: 
 ```bash
 amk_rxn_stats.py FINALDIR -r RXNFILE
 ```

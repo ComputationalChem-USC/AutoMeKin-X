@@ -1,78 +1,83 @@
 ---
-title: 5. Visualization and analysis with amk_tools
+title: 5. Visualization and analysis with amk_tools_X
 layout: home
 nav_order: 5
 parent: Beginners tutorial
 permalink: /docs/beginners_amktools.html
 ---
-# Visualization and analysis with `amk_tools`
+# Visualization and analysis with `amk_tools_X`
 
 Continuation of the previous two pages: this page installs
-`amk_tools`, the companion tool for **visualizing** and **analyzing**
-the reaction networks AutoMeKin generates, and walks through all of
+`amk_tools_X`, the companion tool for **visualizing** and **analyzing**
+the reaction networks AutoMeKin-X generates, and walks through all of
 its features on the real results from the ORCA/DFT and UMA pages.
 
-## What `amk_tools` is, and why it lives in a separate environment <a name="what-is"></a>
+## What `amk_tools_X` is <a name="what-is"></a>
 
-[`amk_tools`](https://github.com/dgarayr/amk_tools), by Diego Garay,
-doesn't run any calculations — it's purely a reader/visualizer. It
-reads the plain-text files and SQLite databases already present inside
-a `FINAL_LL_*`, `FINAL_HL_*`, or `FINAL_ML_*` folder, and from that
-builds:
+[`amk_tools_X`](https://github.com/ComputationalChem-USC/amk_tools_X)
+is the version of `amk_tools` maintained by the ComputationalChem-USC
+group for AutoMeKin-X. It is based on the original
+[`amk_tools`](https://github.com/dgarayr/amk_tools) by Diego
+Garay-Ruiz, updated to run in the same Python environment as
+AutoMeKin-X (Python 3.11, numpy 2.x, Bokeh 3.x).
 
-- an **interactive visualization** of the reaction network (HTML,
-  navigable in any browser), and
+It doesn't run any calculations: it's purely a reader and visualizer.
+It reads the plain-text files and SQLite databases already present
+inside a `FINAL_LL_*`, `FINAL_HL_*`, or `FINAL_ML_*` folder, and from
+that builds:
+
+- an **interactive dashboard** of the reaction network (a single HTML
+  file you can open in any browser), with the network, a 3D viewer
+  (JSmol) for every minimum and transition state, including its normal
+  modes, and the energy profiles, and
 - **statistics** on that network's topology (number of nodes/edges,
   average path length, clustering coefficient, etc., compared against
   an equivalent random graph).
 
 {: .note }
-**Why it needs its own conda environment, separate from `amk_env`:**
-`amk_tools` pins `bokeh<3.0.0`, and due to that Bokeh version's own
-dependencies, requires `numpy<2`. If the MLIP models (MACE/UMA) were
-installed on the [installation page](beginners_install.html) (step
-7.3), `amk_env` has `numpy>=2` — a combination `amk_tools` simply
-won't start with (`AttributeError: module 'numpy' has no attribute
-'bool8'`). Rather than forcing a version combination that breaks one
-thing or the other, the cleanest approach is a completely separate
-`amk_view` environment, just for this. This is safe because
-`amk_tools` **never interacts with AutoMeKin itself** — it only reads
-already-generated files. Installing, upgrading, or even deleting
-`amk_view` entirely has zero effect on the AutoMeKin installation or
-on `amk_env`.
+**No separate environment needed.** The original `amk_tools` required
+`bokeh<3` and `numpy<2`, which clashed with the `numpy>=2` that the
+MLIP models (MACE/UMA) install in `amk_env`, so it had to live in its
+own environment. `amk_tools_X` works with numpy 2.x and Bokeh 3.4 to
+3.9, so it installs directly in `amk_env`. It also no longer needs
+`jsmol_bokeh_extension` or NodeJS: JSmol is loaded from a CDN when the
+HTML file is opened.
 
-## Isolated installation <a name="installation"></a>
+## Installation <a name="installation"></a>
+
+With `amk_env` active:
 
 ```bash
-conda create -n amk_view python=3.11 -y
-conda activate amk_view
-pip install git+https://github.com/dgarayr/jsmol_to_bokeh.git
-pip install --no-deps git+https://github.com/dgarayr/amk_tools.git
-pip install "bokeh>=2.3.2,<3.0.0" "numpy<2" networkx matplotlib scipy
+conda activate amk_env
+pip install git+https://github.com/ComputationalChem-USC/amk_tools_X.git
 ```
 
-`pip install` only provides the importable `RXReader`/`RXVisualizer`
-modules — it doesn't install the command-line tools (`amk_gen_view.py`,
-`amk_rxn_stats.py`), since the package doesn't declare them as entry
-points. Fetch those separately into this same environment's `bin`
-folder:
+This installs the `RXReader` and `RXVisualizer` modules **and** the
+command-line tools `amk_gen_view.py` and `amk_rxn_stats.py`, which are
+copied into the environment's `bin/` folder. Check the installation:
 
 ```bash
-curl -L -o $CONDA_PREFIX/bin/amk_gen_view.py https://github.com/dgarayr/amk_tools/raw/master/scripts/amk_gen_view.py
-curl -L -o $CONDA_PREFIX/bin/amk_rxn_stats.py https://github.com/dgarayr/amk_tools/raw/master/scripts/amk_rxn_stats.py
-chmod +x $CONDA_PREFIX/bin/amk_gen_view.py $CONDA_PREFIX/bin/amk_rxn_stats.py
-```
-
-Verify both commands respond:
-
-```bash
+python -c "import RXReader, RXVisualizer, bokeh, numpy; print(bokeh.__version__, numpy.__version__)"
 amk_gen_view.py --help
 amk_rxn_stats.py --help
 ```
 
-From here on, generating a visualization or statistics only requires
-`conda activate amk_view` — `amk_env` or AutoMeKin do **not** need to
-be active at the same time.
+If you want to modify the code, clone the repository and install it in
+editable mode instead:
+
+```bash
+git clone https://github.com/ComputationalChem-USC/amk_tools_X.git
+cd amk_tools_X
+pip install -e .
+```
+
+{: .warning }
+If you installed the old `amk_tools` (from `dgarayr/amk_tools`) before,
+remove it from the environment where you install `amk_tools_X`
+(`pip uninstall amk_tools jsmol_bokeh_extension`) and take any old copy
+of its `scripts` folder out of your `$PATH`, so the new version is the
+one that runs. An old `amk_view` environment created for it can simply
+be deleted: `conda env remove -n amk_view`.
 
 ## The two tools: overview <a name="tools-overview"></a>
 
@@ -168,8 +173,8 @@ to the global minimum's energy.
    <img src="{{ "/assets/images/beginners_tutorial/PLOT.png" | relative_url }}" alt="Energy profile of the reaction network" width="600">
 </p>
 
-The generated HTML file also includes an energy profile of the
-reaction network, viewable by clicking the "Show profile" tab. In the
+The generated HTML dashboard also shows the energy profiles of the
+reaction network, below the network and the 3D viewer. In the
 image above, **PR8** and **PR9** are the barrierless products,
 obtained and stored in `RXNet.barrless`.
 
@@ -235,8 +240,8 @@ interconnected rather than randomly scattered.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `ModuleNotFoundError: No module named 'RXVisualizer'` | `pip install` only provides the modules, not the command-line scripts | Download `amk_gen_view.py`/`amk_rxn_stats.py` with `curl` as shown above |
-| `AttributeError: module 'numpy' has no attribute 'bool8'` | `amk_env` is active (with `numpy>=2` from the MLIP setup) instead of `amk_view` | `conda activate amk_view` before running any `amk_tools` command |
+| `amk_gen_view.py: command not found` or `ModuleNotFoundError: No module named 'RXVisualizer'` | `amk_tools_X` is not installed in the active environment | `conda activate amk_env` and install it as shown above |
+| `AttributeError: module 'numpy' has no attribute 'bool8'` | An old `amk_tools` (Bokeh 2) is the one running, not `amk_tools_X` | `pip uninstall amk_tools jsmol_bokeh_extension`, remove its `scripts` folder from `$PATH`, and reinstall `amk_tools_X` |
 | The HTML comes out blank or very small | Network with very few nodes, or `--efilter` too restrictive | Try without `--efilter`, or check that `finaldir`/`rxnfile` point to real results |
 | `finaldir must be passed` from `amk_rxn_stats.py` | Missing the required `finaldir` positional argument | `amk_rxn_stats.py <FINAL_folder>` — it's required, unlike the options |
 

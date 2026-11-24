@@ -81,9 +81,16 @@ AutoMeKin needs. Instead, call Qcore through a small wrapper on your `PATH`
 (_e.g._, `$AMK/bin/qcore` containing
 `exec /path/to/envs/qcore-0.8.14-env/bin/qcore "$@"`).
 
-## Installing `amk_tools` <a name="amktools"></a>
+## Installing `amk_tools_X` <a name="amktools"></a>
 
-[`amk_tools`](https://github.com/dgarayr/amk_tools) is strongly recommended
+[`amk_tools_X`](https://github.com/ComputationalChem-USC/amk_tools_X) is strongly recommended
 for analyzing the results (interactive reaction networks and network
-statistics). Install it following the instructions in its repository, or see
-[Visualization and analysis with amk_tools](beginners_amktools.html).
+statistics). It installs in the same `amk_env` environment:
+
+```bash
+conda activate amk_env
+pip install git+https://github.com/ComputationalChem-USC/amk_tools_X.git
+```
+
+See [Visualization and analysis with amk_tools_X](beginners_amktools.html)
+for a full walkthrough.

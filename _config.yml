@@ -10,7 +10,7 @@ aux_links:
   "Web app":
     - "https://rxnkin.usc.es/amk/"
   "amk_tools_X":
-    - "https://github.com/OmarRodriguezLopez1398/amk_tools_X"
+    - "https://github.com/ComputationalChem-USC/amk_tools_X"
 aux_links_new_tab: true
 
 # Copy button on every code block

@@ -130,4 +130,4 @@ network, with a clear cost/accuracy trade-off. The same workflow (just
 swapping `HighLevel mlip uma` for `HighLevel mlip mace`) works to try
 MACE, the other supported MLIP model. The [next
 page](beginners_amktools.html) covers how to visualize and analyze
-these results with `amk_tools`.
+these results with `amk_tools_X`.

@@ -85,7 +85,7 @@ nav_order: 1
 
 <section class="landing-section reveal" id="demo">
   <h2 class="landing-h2">Explore a real reaction network</h2>
-  <p class="landing-sub">The low-level network of formic acid, as produced by AutoMeKin-X and drawn with <a href="https://github.com/OmarRodriguezLopez1398/amk_tools_X" target="_blank" rel="noopener">amk_tools_X</a>. Drag and zoom the network, click a node or an edge to see its 3D structure and normal modes, and follow the energy profiles.</p>
+  <p class="landing-sub">The low-level network of formic acid, as produced by AutoMeKin-X and drawn with <a href="https://github.com/ComputationalChem-USC/amk_tools_X" target="_blank" rel="noopener">amk_tools_X</a>. Drag and zoom the network, click a node or an edge to see its 3D structure and normal modes, and follow the energy profiles.</p>
   <div class="demo-frame" data-demo-src="{{ '/assets/demo/formic-acid-network.html' | relative_url }}">
     <img src="{{ '/assets/images/beginners_tutorial/network.png' | relative_url }}" alt="Preview of the formic acid reaction network">
     <button type="button" class="btn-amk btn-amk-primary demo-launch">Launch the interactive demo</button>

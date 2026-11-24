@@ -15,10 +15,10 @@ If you use AutoMeKin-X, please cite the following publications:
 [Martinez-Nunez, E., Phys. Chem. Chem. Phys. **2015** , 17 , 14912](https://pubs.rsc.org/en/content/articlelanding/2015/cp/c5cp02175h)  
 [MOPAC2016, Version: 21. 129 , James J. P. Stewart, Stewart Computational Chemistry](https://github.com/openmopac/mopac)  
 
-If you employ [![GitHub - amk_tools](https://img.shields.io/badge/GitHub-amk_tools-blue?logo=github)](https://github.com/dgarayr/amk_tools/), the following publication must be cited:
+If you employ [![GitHub - amk_tools_X](https://img.shields.io/badge/GitHub-amk__tools__X-blue?logo=github)](https://github.com/ComputationalChem-USC/amk_tools_X) (based on the original [amk_tools](https://github.com/dgarayr/amk_tools)), the following publication must be cited:
 
 {: .highlight }  
-[Garay-Ruiz, D. et al. , APS Phys. Chem. Au **2022**, 2, 225](https://pubs.acs.org/doi/10.1021/acsphyschemau.1c00051)
+[Garay-Ruiz, D. et al. , ACS Phys. Chem. Au **2022**, 2, 225](https://pubs.acs.org/doi/10.1021/acsphyschemau.1c00051)
 
 If `Entos Qcore` is employed, you must cite:
 

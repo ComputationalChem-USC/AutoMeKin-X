@@ -49,7 +49,7 @@ having read the User guide first.
   </a>
   <a class="step-card" href="beginners_amktools.html">
     <span class="step-num">5</span>
-    <span class="step-title">Visualization with amk_tools</span>
+    <span class="step-title">Visualization with amk_tools_X</span>
     <p>Interactive reaction-network dashboards and network statistics from your results.</p>
   </a>
 </div>
