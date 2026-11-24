@@ -37,6 +37,8 @@ dependencies:
       - torch
       - sella
       - omegaconf
-      - mace-torch
       - fairchem-core
+      # mace-torch is NOT installed here: its e3nn pin conflicts with
+      # fairchem-core in a single pip resolve. For MACE, install it afterwards
+      # in a separate command:  pip install mace-torch
 

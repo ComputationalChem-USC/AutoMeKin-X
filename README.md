@@ -120,23 +120,35 @@ That's it — no other keyword changes are needed. Everything else (`LowLevel`, 
 
 ## Installation and documentation <a name="inst"></a>
 
-Verify if your version is up to date [here](https://github.com/ComputationalChem-USC/AutoMeKin-X/blob/main/ChangeLog.md).  
-Full installation instructions and documentation are [detailed here](https://computationalchem-usc.github.io/AutoMeKin-X).  
-New to AutoMeKin? [📥 Download the complete beginners tutorial as a PDF](https://computationalchem-usc.github.io/AutoMeKin-X/assets/files/AutoMeKin-Beginners-Tutorial.pdf) — a from-zero, step-by-step walkthrough.
+- **Documentation:** full installation instructions and the user guide are at [computationalchem-usc.github.io/AutoMeKin-X](https://computationalchem-usc.github.io/AutoMeKin-X).
+- **New to AutoMeKin?** The [beginners tutorial](https://computationalchem-usc.github.io/AutoMeKin-X/docs/beginners.html) is a from-zero, step-by-step walkthrough on a clean Ubuntu machine, including ORCA and the MLIP models.
+- **What's new:** check whether your version is up to date in the [ChangeLog](https://github.com/ComputationalChem-USC/AutoMeKin-X/blob/main/ChangeLog.md).
 
-Build scripts for common platforms are included:
+### Quick install
 
-```bash
-bash Build_Ubuntu.sh      # Ubuntu/Debian
-bash Build_Centos.sh      # CentOS/RHEL
-bash Build_micromamba.sh  # any platform via micromamba
-```
-
-A ready-to-use conda environment file is also provided:
+AutoMeKin-X is built from source with the GNU toolchain. Create the Python environment, then build the program:
 
 ```bash
+git clone https://github.com/ComputationalChem-USC/AutoMeKin-X.git
+cd AutoMeKin-X
 conda env create -f automekin.yml
+conda activate amk_env
+pip install mace-torch   # only for MACE; separate step (e3nn conflicts with fairchem-core in one install)
+autoreconf -i
+./configure --prefix=path_to_program
+make
+make install
 ```
+
+Then add the program to your `PATH` (or use `module use path_to_program/modules` and `module load amk/2021`):
+
+```bash
+export AMK=path_to_program
+export PATH=$AMK/bin:$AMK/bin/HLscripts:$AMK/bin/MOPAC_DEV:$PATH
+export LIBRARY_PATH=$AMK/lib:$AMK/bin/MOPAC_DEV
+```
+
+`automekin.yml` also installs [amk_tools_X](https://github.com/ComputationalChem-USC/amk_tools_X) (`amk_gen_view.py`, `amk_rxn_stats.py`) to visualize and analyze the reaction networks. The system requirements, the high-level engines (ORCA, Gaussian, Qcore) and the MLIP models are described in the [installation page](https://computationalchem-usc.github.io/AutoMeKin-X/docs/installation.html).
 
 ---
 
