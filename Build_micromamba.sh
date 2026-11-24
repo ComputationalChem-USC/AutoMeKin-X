@@ -14,10 +14,7 @@ eval "$(micromamba shell hook --shell bash)"
 micromamba create -y -f automekin.yml
 micromamba activate amk_env
 
-curl -L -o $CONDA_PREFIX/bin/amk_gen_view.py https://github.com/dgarayr/amk_tools/raw/master/scripts/amk_gen_view.py
-chmod +x $CONDA_PREFIX/bin/amk_gen_view.py 
-curl -L -o $CONDA_PREFIX/bin/amk_rxn_stats.py https://github.com/dgarayr/amk_tools/raw/master/scripts/amk_rxn_stats.py
-chmod +x $CONDA_PREFIX/bin/amk_rxn_stats.py
+# amk_tools_X (amk_gen_view.py, amk_rxn_stats.py) is installed by automekin.yml
 } &>$0.log
 
 echo "amk_env installed ..."
@@ -25,8 +22,8 @@ echo "amk_env installed ..."
 {
 mkdir $CONDA_PREFIX/install_dir
 cd $CONDA_PREFIX/install_dir
-git clone https://github.com/emartineznunez/AutoMeKin.git
-cd AutoMeKin
+git clone https://github.com/ComputationalChem-USC/AutoMeKin-X.git
+cd AutoMeKin-X
 autoreconf -i
 ./configure --prefix=$CONDA_PREFIX/opt/AutoMeKin
 make
@@ -45,8 +42,8 @@ echo "AutoMeKin installation done  ..."
 
 cat <<'EOL'
 
-AutoMeKin 2021
-https://github.com/emartineznunez/AutoMeKin
+AutoMeKin-X
+https://github.com/ComputationalChem-USC/AutoMeKin-X
 
 EOL
 

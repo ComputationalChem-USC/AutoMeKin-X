@@ -35,8 +35,8 @@ pip3 install ase
 pip3 install networkx
 mkdir /install_dir
 cd /install_dir
-git clone https://github.com/emartineznunez/AutoMeKin.git
-cd AutoMeKin
+git clone https://github.com/ComputationalChem-USC/AutoMeKin-X.git
+cd AutoMeKin-X
 autoreconf -i
 ./configure --prefix=/opt/AutoMeKin
 make
@@ -45,9 +45,7 @@ cd /install_dir
 curl -O https://github.com/emartineznunez/amk_utils/raw/main/molden6.2.full.ubuntu.64.tar.gz
 cd /opt
 tar zxvf /install_dir/molden6.2.full.ubuntu.64.tar.gz
-git clone https://github.com/dgarayr/amk_tools.git
-cd amk_tools
+git clone https://github.com/ComputationalChem-USC/amk_tools_X.git
+cd amk_tools_X
 pip3 install -e .
-cd scripts
-chmod +x amk_gen_view.py
 rm -rf /install_dir

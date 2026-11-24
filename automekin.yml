@@ -24,14 +24,14 @@ dependencies:
   - matplotlib
   - sqlite
   - bc
-  - nodejs
   - curl
   - pillow
   - joblib
   - tbb[version='<2021']
   - pip
   - pip:
-      - git+https://github.com/dgarayr/amk_tools.git
+      # Reaction-network visualization and statistics (amk_gen_view.py, amk_rxn_stats.py)
+      - git+https://github.com/ComputationalChem-USC/amk_tools_X.git
       # MLIP backend (HighLevel mlip uma/mace) -- installed via pip to avoid
       # disturbing the conda solve (qcore/entos pins tbb<2021 above)
       - torch
