@@ -29,7 +29,7 @@ More details can be found in the [user guide](https://github.com/ComputationalCh
 
 Example of an interactive dashboard for FA: the reaction network, the 3D structure of a selected node or edge (_i.e._, a minimum or a TS) with its normal modes, and the energy profiles.
 <p align="center">
-   <img src="{{ "/assets/images/amk.jpg" | relative_url }}" alt="alt text" width="800" height="400">
+   <img src="{{ "/assets/images/amk_tools_X/dashboard.jpg" | relative_url }}" alt="amk_tools_X dashboard for formic acid" width="800">
 </p>
 
 ## Properties of the reaction network<a name="amktools2"></a>

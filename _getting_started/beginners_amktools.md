@@ -161,22 +161,27 @@ HL methods (each lives in its own folder, so using the same filename
 for both doesn't clash).
 
 <p align="center">
-   <img src="{{ "/assets/images/beginners_tutorial/network.png" | relative_url }}" alt="Reaction network generated from RXNet.rel with UMA-refined results" width="700">
+   <img src="{{ "/assets/images/amk_tools_X/dashboard.jpg" | relative_url }}" alt="amk_tools_X dashboard for formic acid: 3D viewer, reaction network and energy profiles" width="800">
 </p>
 
-This is the network generated from `RXNet.rel` with the results
-refined using UMA: each node is a species (minima or products) and
-each edge is a transition state connecting them, positioned relative
-to the global minimum's energy.
+This is the dashboard generated from `RXNet.rel` for formic acid. At
+the top, the menu bar loads the normal modes of the selected structure,
+copies its XYZ coordinates or locates a species by name. On the left,
+the **molecule viewer** (JSmol) shows the structure selected in the
+network, here the transition state TS7. On the right, the **reaction
+network**: each node is a species (minimum or product) and each edge
+is a transition state connecting two of them, coloured by energy
+relative to the reference minimum.
 
 <p align="center">
-   <img src="{{ "/assets/images/beginners_tutorial/PLOT.png" | relative_url }}" alt="Energy profile of the reaction network" width="600">
+   <img src="{{ "/assets/images/amk_tools_X/profiles.png" | relative_url }}" alt="Energy profiles and reaction schemes in the amk_tools_X dashboard" width="800">
 </p>
 
-The generated HTML dashboard also shows the energy profiles of the
-reaction network, below the network and the 3D viewer. In the
-image above, **PR8** and **PR9** are the barrierless products,
-obtained and stored in `RXNet.barrless`.
+Below them, the dashboard shows the **energy profiles** found with
+`--paths`, and the reaction scheme of each one. The profiles can be
+filtered by the selected species or by a maximum energy. Barrierless
+channels, read from `RXNet.barrless` with `--barrierless`, appear as
+`TSb_*` steps leading to products with no transition state.
 
 {: .note }
 Product numbers (PR#) may not match between different runs. That's

@@ -20,6 +20,11 @@ If you employ [![GitHub - amk_tools_X](https://img.shields.io/badge/GitHub-amk__
 {: .highlight }  
 [Garay-Ruiz, D. et al. , ACS Phys. Chem. Au **2022**, 2, 225](https://pubs.acs.org/doi/10.1021/acsphyschemau.1c00051)
 
+and the `amk_tools_X` repository itself (see its [CITATION.cff](https://github.com/ComputationalChem-USC/amk_tools_X/blob/master/CITATION.cff)):
+
+{: .highlight }  
+[Garay-Ruiz, D.; Rodriguez-Lopez, O. amk_tools_X, https://github.com/ComputationalChem-USC/amk_tools_X](https://github.com/ComputationalChem-USC/amk_tools_X)
+
 If `Entos Qcore` is employed, you must cite:
 
 {: .highlight }  
