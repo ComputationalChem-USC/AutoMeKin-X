@@ -77,7 +77,7 @@ nav_order: 1
       <div class="flow-slide" data-slide="7"><img src="{{ '/assets/images/workflow/candidates.png' | relative_url }}" alt="Transition state candidates"><p><strong>TS candidates.</strong> The low-level transition states are passed to the refinement.</p></div>
       <div class="flow-slide" data-slide="8"><div class="engine-cloud"><span>Gaussian</span><span>ORCA</span><span>Qcore</span><span>UMA</span><span>MACE</span><span>Δ-ML</span></div><p><strong>High-level engine.</strong> DFT or ab initio codes, ML potentials, or DFT with a Δ-ML correction.</p></div>
       <div class="flow-slide" data-slide="9"><img class="on-light" src="{{ '/assets/images/workflow/irc.png' | relative_url }}" alt="IRC energy profile"><p><strong>Re-optimization.</strong> TSs, IRCs, minima and barrierless channels are recomputed at the high level.</p></div>
-      <div class="flow-slide" data-slide="10"><img class="on-light" src="{{ '/assets/images/beginners_tutorial/network.png' | relative_url }}" alt="Final reaction network of formic acid"><p><strong>Final network.</strong> Rate constants and kinetic Monte Carlo give the populations of every species over time.</p></div>
+      <div class="flow-slide" data-slide="10"><img class="on-light" src="{{ '/assets/images/home/network.png' | relative_url }}" alt="Final reaction network of formic acid"><p><strong>Final network.</strong> Rate constants and kinetic Monte Carlo give the populations of every species over time.</p></div>
     </div>
   </div>
   <p class="flow-more"><a href="{{ '/assets/images/workflow/workflow-full.jpg' | relative_url }}" target="_blank" rel="noopener">See the full diagram</a> · <a href="{{ '/docs/tutorial.html' | relative_url }}">Read how it works</a></p>
@@ -87,7 +87,7 @@ nav_order: 1
   <h2 class="landing-h2">Explore a real reaction network</h2>
   <p class="landing-sub">The low-level network of formic acid, as produced by AutoMeKin-X and drawn with <a href="https://github.com/ComputationalChem-USC/amk_tools_X" target="_blank" rel="noopener">amk_tools_X</a>. Drag and zoom the network, click a node or an edge to see its 3D structure and normal modes, and follow the energy profiles.</p>
   <div class="demo-frame" data-demo-src="{{ '/assets/demo/formic-acid-network.html' | relative_url }}">
-    <img src="{{ '/assets/images/beginners_tutorial/network.png' | relative_url }}" alt="Preview of the formic acid reaction network">
+    <img src="{{ '/assets/images/home/demo-preview.jpg' | relative_url }}" alt="Preview of the amk_tools_X dashboard for formic acid">
     <button type="button" class="btn-amk btn-amk-primary demo-launch">Launch the interactive demo</button>
   </div>
   <p class="demo-note">The demo loads Bokeh and JSmol from the internet. <a href="{{ '/assets/demo/formic-acid-network.html' | relative_url }}" target="_blank" rel="noopener">Open it in a new tab</a>.</p>
@@ -97,15 +97,15 @@ nav_order: 1
   <h2 class="landing-h2">What you get</h2>
   <div class="gallery">
     <figure>
-      <img src="{{ '/assets/images/beginners_tutorial/network.png' | relative_url }}" alt="Reaction network with structures">
-      <figcaption><strong>Reaction network.</strong> Minima, products and transition states with their structures.</figcaption>
+      <img src="{{ '/assets/images/home/network.png' | relative_url }}" alt="Reaction network of formic acid">
+      <figcaption><strong>Reaction network.</strong> Minima, products and transition states, with the 3D structure of each one in the dashboard.</figcaption>
     </figure>
     <figure>
-      <img src="{{ '/assets/images/beginners_tutorial/PLOT.png' | relative_url }}" alt="Energy profiles">
+      <img src="{{ '/assets/images/home/profiles.png' | relative_url }}" alt="Energy profiles">
       <figcaption><strong>Energy profiles.</strong> Every path between two species, filtered by energy.</figcaption>
     </figure>
     <figure>
-      <img src="{{ '/assets/images/kinetics.png' | relative_url }}" alt="Populations versus time">
+      <img src="{{ '/assets/images/home/kinetics.png' | relative_url }}" alt="Populations versus time">
       <figcaption><strong>Kinetics.</strong> Populations over time and product branching ratios.</figcaption>
     </figure>
   </div>

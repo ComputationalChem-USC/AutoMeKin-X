@@ -30,6 +30,8 @@ collections:
     output: true
   user_guide:
     output: true
+  beginners:
+    output: true
   engines:
     output: true
   advanced:
@@ -43,6 +45,8 @@ just_the_docs:
       name: Getting started
     user_guide:
       name: User guide
+    beginners:
+      name: Beginners tutorial
     engines:
       name: Engines
     advanced:
