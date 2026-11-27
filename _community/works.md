@@ -33,10 +33,9 @@ If you have used AutoMeKin in your work, please [cite it](cite.html).
 <h2 id="y{{ g.name }}">{{ g.name }} <span class="pub-count">{{ g.size }}</span></h2>
 <div class="pub-grid">
 {% for p in g.items %}
-  <a class="pub-card" href="{{ p.url }}" target="_blank" rel="noopener" data-search="{{ p.journal | downcase }} {{ p.year }} {{ p.title | strip_html | downcase }} {{ p.authors | downcase }}">
+  <a class="pub-card" href="{{ p.url }}" target="_blank" rel="noopener" data-search="{{ p.journal | downcase }} {{ p.year }} {{ p.title | downcase }}">
     <span class="pub-journal">{{ p.journal }}</span>
     {% if p.title != "" %}<span class="pub-title">{{ p.title }}</span>{% endif %}
-    {% if p.authors %}<span class="pub-meta">{{ p.authors }}</span>{% endif %}
     <span class="pub-meta">{{ p.year }} · {% if p.url contains "doi" %}DOI{% else %}Article{% endif %} ↗</span>
   </a>
 {% endfor %}
