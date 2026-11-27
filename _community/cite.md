@@ -13,7 +13,6 @@ If you use AutoMeKin-X, please cite the following publications:
 [Martinez-Nunez, E. et al., J. Comput. Chem. **2021**, 42, 2036](https://onlinelibrary.wiley.com/doi/full/10.1002/jcc.26734)  
 [Martinez-Nunez, E., J. Comput. Chem. **2015**, 36, 222](https://onlinelibrary.wiley.com/doi/10.1002/jcc.23790)  
 [Martinez-Nunez, E., Phys. Chem. Chem. Phys. **2015** , 17 , 14912](https://pubs.rsc.org/en/content/articlelanding/2015/cp/c5cp02175h)  
-[MOPAC2016, Version: 21. 129 , James J. P. Stewart, Stewart Computational Chemistry](https://github.com/openmopac/mopac)  
 
 If you employ [![GitHub - amk_tools_X](https://img.shields.io/badge/GitHub-amk__tools__X-blue?logo=github)](https://github.com/ComputationalChem-USC/amk_tools_X) (based on the original [amk_tools](https://github.com/dgarayr/amk_tools)), the following publication must be cited:
 
