@@ -181,9 +181,39 @@ network by using the `allstates` option, as described in the next section.
 
 ### RXNet.rel 
 
-This ifle is similar to `RXNet.cg`, but only collects the relevant paths, that is, those included in the
-`Energy_profile.pdf` file. A maximum of 100 TSs are printed in this file. If this number is reached, both
-`Energy_profile.pdf` and `RXNet.rel` would be incomplete, and the pathways drawn in `Energy_profile.pdf` could be less than those that appear in `RXNet.rel`.
+`RXNet.rel` is the part of `RXNet.cg` that **actually matters for the kinetics**. Both files list the same
+type of reactions, with the same format and numbering, but they answer different questions:
+
+| File | What it contains |
+|---|---|
+| `RXNet.cg` | **Every** reaction of the coarse-grained network (conformers merged into one state), whether or not it is ever used, including high-energy channels and disconnected ones (`DISCONN`). |
+| `RXNet.rel` | Only the reactions that are **used in the kinetic Monte Carlo (KMC) simulation** started from the input minimum, that is, the *relevant* paths. |
+
+It is built in three steps:
+
+1. **Only reactions with flux.** During the KMC simulation, AutoMeKin counts how many times each reaction
+   takes place. A reaction is kept if its share of all the events is larger than
+   [`ImpPaths`](advanced_options.html#kw-imppaths) (in %). With the default value, `0`, every
+   reaction that happens **at least once** is kept; a reaction that the system never goes through, for
+   example because its barrier is much higher than that of a competing channel, is left out.
+2. **At most 100 reactions**, the ones with the largest number of events.
+3. **Only reactions connected to the starting minimum**, so that every line belongs to a path that the
+   system can follow from the input structure. For this reason, the `CONN`/`DISCONN` column of `RXNet.cg`
+   is not printed.
+
+In the formic acid example above, `RXNet.rel` would keep, for instance, the decomposition channels of
+MIN 1 and MIN 3 to CO + H<sub>2</sub>O and H<sub>2</sub> + CO<sub>2</sub>, but not the disconnected
+reactions of MIN 7 and MIN 8, nor any connected channel whose barrier is too high to be crossed in the
+simulation.
+
+`RXNet.rel` is therefore a much shorter and easier to read summary of the mechanism, and it is the usual
+choice to visualize the main paths with [amk_tools_X](analysis.html#amktools)
+(`amk_gen_view.py FINAL_LL_<molecule> RXNet.rel --paths`).
+
+{: .note }
+Because `RXNet.rel` depends on the KMC simulation, it changes with the conditions of the kinetics
+(`Energy` or `Temperature`) and with `ImpPaths`. If it contains exactly 100 reactions, the limit has been
+reached and some relevant channels may be missing: increase `ImpPaths` to keep only the most important ones.
 
 ### rxn_x.txt $\scriptstyle{(}$x = all, kin$\scriptstyle{)}$ 
 

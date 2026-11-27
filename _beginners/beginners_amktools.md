@@ -100,7 +100,7 @@ amk_gen_view.py <finaldir> <rxnfile> [options]
 | Argument | Meaning |
 |---|---|
 | `finaldir` | The results folder: `FINAL_LL_<molecule>`, `FINAL_HL_<molecule>`, or `FINAL_ML_<molecule>` |
-| `rxnfile` | Which version of the network to use: `RXNet` (full), `RXNet.cg` (connected graph), or `RXNet.rel` (already filtered/relativized) |
+| `rxnfile` | Which version of the network to use: `RXNet` (full), `RXNet.cg` (coarse-grained: conformers merged into one state), or `RXNet.rel` (only the reactions used in the kinetics; see [Output files](results.html)) |
 
 **"RXN parsing" group — what to include and how to reference energies:**
 

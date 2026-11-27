@@ -214,7 +214,7 @@ Inside `FINAL_LL_FA/` (replace `FA` with the molecule's name):
 | File | What it is |
 |---|---|
 | `RXNet` | The full reaction network: each TS, its relative energy (ΔE in kcal/mol vs. the global minimum), and what it connects (`MIN i <---> MIN j`, or `MIN i ----> PRk: formula` for irreversible channels to products) |
-| `RXNet.rel` / `RXNet.cg` | Filtered/reduced variants of the network (only the relevant channels, or the connected graph) |
+| `RXNet.cg` / `RXNet.rel` | Coarse-grained network (conformers merged into one state), and the part of it that the kinetics actually uses (see [Output files](results.html)) |
 | `RXNet.barrless` | Barrierless dissociation channels found by NEB |
 | `MINinfo` | List of minima with their ΔE; conformational isomers are grouped on the same line |
 | `TSinfo` | List of TSs with their ΔE (same format) |
